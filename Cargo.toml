@@ -1,11 +1,11 @@
 [package]
 name = "v_frame"
-version = "0.2.5"
-description = "Video Frame data structures, part of rav1e"
+version = "0.2.6"
+description = "Video Frame data structures, originally part of rav1e"
 license = "BSD-2-Clause"
 authors = ["Luca Barbato <lu_zero@gentoo.org>"]
 edition = "2021"
-repository = "https://github.com/xiph/rav1e/"
+repository = "https://github.com/rust-av/v_frame"
 
 [features]
 serialize = ["serde"]
