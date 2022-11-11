@@ -43,26 +43,26 @@ pub mod pixel;
 pub mod plane;
 
 mod serialize {
-  cfg_if::cfg_if! {
-     if #[cfg(feature="serialize")] {
-       pub use serde::*;
-      } else {
-        pub use noop_proc_macro::{Deserialize, Serialize};
-     }
-  }
+    cfg_if::cfg_if! {
+       if #[cfg(feature="serialize")] {
+         pub use serde::*;
+        } else {
+          pub use noop_proc_macro::{Deserialize, Serialize};
+       }
+    }
 }
 
 mod wasm_bindgen {
-  cfg_if::cfg_if! {
-    if #[cfg(feature="wasm")] {
-      pub use wasm_bindgen::prelude::*;
-    } else {
-      pub use noop_proc_macro::wasm_bindgen;
+    cfg_if::cfg_if! {
+      if #[cfg(feature="wasm")] {
+        pub use wasm_bindgen::prelude::*;
+      } else {
+        pub use noop_proc_macro::wasm_bindgen;
+      }
     }
-  }
 }
 
 pub mod prelude {
-  pub use crate::math::*;
-  pub use crate::pixel::*;
+    pub use crate::math::*;
+    pub use crate::pixel::*;
 }
