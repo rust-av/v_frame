@@ -683,6 +683,15 @@ impl<T: Pixel> Plane<T> {
         }
     }
 
+    pub fn rows_iter_mut(&mut self) -> RowsIterMut<'_, T> {
+        RowsIterMut {
+            plane: self as *mut Plane<T>,
+            x: 0,
+            y: 0,
+            phantom: PhantomData,
+        }
+    }
+
     /// Return a line
     pub fn row(&self, y: isize) -> &[T] {
         let range = self.row_range(0, y);
