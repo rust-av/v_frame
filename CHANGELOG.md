@@ -1,3 +1,7 @@
+## Version 0.3.2
+
+- Reduce amount of boilerplace and unsafe code in `PlaneData`
+
 ## Version 0.3.1
 
 - Add `rows_iter_mut` method to `Plane`
