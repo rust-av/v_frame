@@ -39,6 +39,7 @@ jobs:
       run: cargo miri test
 
   code-coverage:
+    needs: [miri, build]
     runs-on: ubuntu-latest
 
     steps:
