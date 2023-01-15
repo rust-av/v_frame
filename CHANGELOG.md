@@ -1,6 +1,8 @@
-## Version 0.3.2
+## Version 0.3.3
 
-- Reduce amount of boilerplace and unsafe code in `PlaneData`
+- Add `row_cropped` and `row_slice_cropped` methods to get rows without padding
+- Make `RowsIter` and `RowsIterMut` return rows without right-side padding for greater consistency/predictability
+- Fix clippy lints
 
 ## Version 0.3.1
 
