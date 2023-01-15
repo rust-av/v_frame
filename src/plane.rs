@@ -814,14 +814,14 @@ impl<'a, T: Pixel> PlaneSlice<'a, T> {
     pub fn clamp(&self) -> PlaneSlice<'a, T> {
         PlaneSlice {
             plane: self.plane,
-            x: self
-                .x
-                .min(self.plane.cfg.width as isize)
-                .max(-(self.plane.cfg.xorigin as isize)),
-            y: self
-                .y
-                .min(self.plane.cfg.height as isize)
-                .max(-(self.plane.cfg.yorigin as isize)),
+            x: self.x.clamp(
+                -(self.plane.cfg.xorigin as isize),
+                self.plane.cfg.width as isize,
+            ),
+            y: self.y.clamp(
+                -(self.plane.cfg.yorigin as isize),
+                self.plane.cfg.height as isize,
+            ),
         }
     }
 
