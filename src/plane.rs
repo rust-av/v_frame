@@ -404,6 +404,19 @@ impl<T: Pixel> Plane<T> {
         (y + self.cfg.yorigin) * self.cfg.stride + (x + self.cfg.xorigin)
     }
 
+    /// This version of the function crops off the padding on the right side of the image
+    #[inline]
+    pub fn row_range_cropped(&self, x: isize, y: isize) -> Range<usize> {
+        debug_assert!(self.cfg.yorigin as isize + y >= 0);
+        debug_assert!(self.cfg.xorigin as isize + x >= 0);
+        let base_y = (self.cfg.yorigin as isize + y) as usize;
+        let base_x = (self.cfg.xorigin as isize + x) as usize;
+        let base = base_y * self.cfg.stride + base_x;
+        let width = (self.cfg.width as isize - x) as usize;
+        base..base + width
+    }
+
+    /// This version of the function includes the padding on the right side of the image
     #[inline]
     pub fn row_range(&self, x: isize, y: isize) -> Range<usize> {
         debug_assert!(self.cfg.yorigin as isize + y >= 0);
@@ -569,8 +582,7 @@ impl<T: Pixel> Plane<T> {
             let src_bottom_row =
                 &data_origin[(src.cfg.stride * (row_idx * 2 + 1))..][..(2 * width)];
 
-            let dst_row_len = dst_row.len();
-            for ((dst, a), b) in dst_row[..width.min(dst_row_len)]
+            for ((dst, a), b) in dst_row
                 .iter_mut()
                 .zip(src_top_row.chunks_exact(2))
                 .zip(src_bottom_row.chunks_exact(2))
@@ -743,6 +755,8 @@ impl<'a, T: Pixel> Iterator for PlaneIter<'a, T> {
 
 impl<T: Pixel> FusedIterator for PlaneIter<'_, T> {}
 
+// A Plane, PlaneSlice, or PlaneRegion is assumed to include or be able to include
+// padding on the edge of the frame
 #[derive(Clone, Copy, Debug)]
 pub struct PlaneSlice<'a, T: Pixel> {
     pub plane: &'a Plane<T>,
@@ -750,6 +764,7 @@ pub struct PlaneSlice<'a, T: Pixel> {
     pub y: isize,
 }
 
+// A RowsIter or RowsIterMut is assumed to crop the padding from the frame edges
 pub struct RowsIter<'a, T: Pixel> {
     plane: &'a Plane<T>,
     x: isize,
@@ -762,7 +777,7 @@ impl<'a, T: Pixel> Iterator for RowsIter<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.plane.cfg.height as isize > self.y {
             // cannot directly return self.ps.row(row) due to lifetime issue
-            let range = self.plane.row_range(self.x, self.y);
+            let range = self.plane.row_range_cropped(self.x, self.y);
             self.y += 1;
             Some(&self.plane.data[range])
         } else {
@@ -866,6 +881,16 @@ impl<'a, T: Pixel> PlaneSlice<'a, T> {
         y >= 0 && x >= 0
     }
 
+    /// This version of the function crops off the padding on the right side of the image
+    pub fn row_cropped(&self, y: usize) -> &[T] {
+        let y = (self.y + y as isize + self.plane.cfg.yorigin as isize) as usize;
+        let x = (self.x + self.plane.cfg.xorigin as isize) as usize;
+        let start = y * self.plane.cfg.stride + x;
+        let width = (self.plane.cfg.width as isize - self.x) as usize;
+        &self.plane.data[start..start + width]
+    }
+
+    /// This version of the function includes the padding on the right side of the image
     pub fn row(&self, y: usize) -> &[T] {
         let y = (self.y + y as isize + self.plane.cfg.yorigin as isize) as usize;
         let x = (self.x + self.plane.cfg.xorigin as isize) as usize;
@@ -904,7 +929,7 @@ impl<'a, T: Pixel> Iterator for RowsIterMut<'a, T> {
         let plane = unsafe { &mut *self.plane };
         if plane.cfg.height as isize > self.y {
             // cannot directly return self.ps.row(row) due to lifetime issue
-            let range = plane.row_range(self.x, self.y);
+            let range = plane.row_range_cropped(self.x, self.y);
             self.y += 1;
             Some(&mut plane.data[range])
         } else {
