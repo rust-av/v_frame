@@ -147,10 +147,11 @@ impl Coefficient for i32 {
 
 /// Chroma subsampling format
 #[wasm_bindgen]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, FromPrimitive, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, FromPrimitive, Serialize, Deserialize)]
 #[repr(C)]
 pub enum ChromaSampling {
     /// Both vertically and horizontally subsampled.
+    #[default]
     Cs420,
     /// Horizontally subsampled.
     Cs422,
@@ -172,12 +173,6 @@ impl fmt::Display for ChromaSampling {
                 ChromaSampling::Cs400 => "Monochrome",
             }
         )
-    }
-}
-
-impl Default for ChromaSampling {
-    fn default() -> Self {
-        ChromaSampling::Cs420
     }
 }
 
