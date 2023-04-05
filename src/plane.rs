@@ -9,6 +9,7 @@
 
 use debug_unreachable::debug_unreachable;
 use rust_hawktracer::*;
+use std::iter::FusedIterator;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Index, IndexMut, Range};
@@ -20,7 +21,6 @@ use std::{
     fmt::{Debug, Display, Formatter},
     usize,
 };
-use std::{iter::FusedIterator, ops::DerefMut};
 
 use crate::math::*;
 use crate::pixel::*;
@@ -635,7 +635,7 @@ impl<T: Pixel> Plane<T> {
                 debug_unreachable!();
             }
 
-            let plane_data_mut_slice = in_plane.data.deref_mut();
+            let plane_data_mut_slice = &mut *in_plane.data;
 
             // Iter dst rows
             for row_idx in 0..height {
