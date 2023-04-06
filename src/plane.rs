@@ -565,36 +565,7 @@ impl<T: Pixel> Plane<T> {
             )
         };
 
-        let width = new.cfg.width;
-        let height = new.cfg.height;
-
-        assert!(width * 2 <= src.cfg.stride - src.cfg.xorigin);
-        assert!(height * 2 <= src.cfg.alloc_height - src.cfg.yorigin);
-
-        let data_origin = src.data_origin();
-        for (row_idx, dst_row) in new
-            .mut_slice(PlaneOffset::default())
-            .rows_iter_mut()
-            .enumerate()
-            .take(height)
-        {
-            let src_top_row = &data_origin[(src.cfg.stride * row_idx * 2)..][..(2 * width)];
-            let src_bottom_row =
-                &data_origin[(src.cfg.stride * (row_idx * 2 + 1))..][..(2 * width)];
-
-            for ((dst, a), b) in dst_row
-                .iter_mut()
-                .zip(src_top_row.chunks_exact(2))
-                .zip(src_bottom_row.chunks_exact(2))
-            {
-                let sum = u32::cast_from(a[0])
-                    + u32::cast_from(a[1])
-                    + u32::cast_from(b[0])
-                    + u32::cast_from(b[1]);
-                let avg = (sum + 2) >> 2;
-                *dst = T::cast_from(avg);
-            }
-        }
+        self.downscale_in_place::<2>(&mut new);
         new.pad(frame_width, frame_height);
         new
     }
@@ -613,9 +584,18 @@ impl<T: Pixel> Plane<T> {
 
     /// Downscales the source plane by a factor of `scale`, writing the result to `in_plane` (not padded)
     ///
-    /// `in_plane`'s width and height must be sufficient for `scale`.
+    /// # Panics
+    ///
+    /// - If the current plane's width and height are not at least `SCALE` times the `in_plane`'s
     #[hawktracer(downscale_in_place)]
     pub fn downscale_in_place<const SCALE: usize>(&self, in_plane: &mut Plane<T>) {
+        let stride = in_plane.cfg.stride;
+        let width = in_plane.cfg.width;
+        let height = in_plane.cfg.height;
+
+        assert!(width * SCALE <= self.cfg.stride - self.cfg.xorigin);
+        assert!(height * SCALE <= self.cfg.alloc_height - self.cfg.yorigin);
+
         // SAFETY: Bounds checks have been removed for performance reasons
         unsafe {
             let src = self;
@@ -623,10 +603,6 @@ impl<T: Pixel> Plane<T> {
             let half_box_pixels = box_pixels as u32 / 2; // Used for rounding int division
 
             let data_origin = src.data_origin();
-
-            let stride = in_plane.cfg.stride;
-            let width = in_plane.cfg.width;
-            let height = in_plane.cfg.height;
 
             if stride == 0 {
                 debug_unreachable!();
