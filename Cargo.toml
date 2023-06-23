@@ -1,6 +1,6 @@
 [package]
 name = "v_frame"
-version = "0.3.3"
+version = "0.3.4"
 description = "Video Frame data structures, originally part of rav1e"
 license = "BSD-2-Clause"
 authors = ["Luca Barbato <lu_zero@gentoo.org>"]
@@ -20,7 +20,6 @@ noop_proc_macro = "0.3.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
 wasm-bindgen = { version = "0.2.63", optional = true }
 rust_hawktracer = "0.7.0"
-new_debug_unreachable = "1.0.4"
 
 [dev-dependencies]
 criterion = { version = "0.4", features = ["html_reports"] }
