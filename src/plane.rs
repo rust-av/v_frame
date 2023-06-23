@@ -7,8 +7,8 @@
 // Media Patent License 1.0 was not distributed with this source code in the
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
-use debug_unreachable::debug_unreachable;
 use rust_hawktracer::*;
+use std::alloc::handle_alloc_error;
 use std::iter::FusedIterator;
 use std::marker::PhantomData;
 use std::mem;
@@ -196,12 +196,17 @@ impl<T: Pixel> PlaneData<T> {
     }
 
     unsafe fn layout(len: usize) -> Layout {
-        Layout::from_size_align_unchecked(len * mem::size_of::<T>(), 1 << Self::DATA_ALIGNMENT_LOG2)
+        Layout::from_size_align(len * mem::size_of::<T>(), 1 << Self::DATA_ALIGNMENT_LOG2)
+            .expect("layout size too large")
     }
 
     unsafe fn new_uninitialized(len: usize) -> Self {
         let ptr = {
-            let ptr = alloc(Self::layout(len)) as *mut T;
+            let layout = Self::layout(len);
+            let ptr = alloc(layout) as *mut T;
+            if ptr.is_null() {
+                handle_alloc_error(layout);
+            }
             std::ptr::NonNull::new_unchecked(ptr)
         };
 
@@ -593,6 +598,10 @@ impl<T: Pixel> Plane<T> {
         let width = in_plane.cfg.width;
         let height = in_plane.cfg.height;
 
+        if stride == 0 || self.cfg.stride == 0 {
+            panic!("stride cannot be 0");
+        }
+
         assert!(width * SCALE <= self.cfg.stride - self.cfg.xorigin);
         assert!(height * SCALE <= self.cfg.alloc_height - self.cfg.yorigin);
 
@@ -603,14 +612,6 @@ impl<T: Pixel> Plane<T> {
             let half_box_pixels = box_pixels as u32 / 2; // Used for rounding int division
 
             let data_origin = src.data_origin();
-
-            if stride == 0 {
-                debug_unreachable!();
-            }
-            if src.cfg.stride == 0 {
-                debug_unreachable!();
-            }
-
             let plane_data_mut_slice = &mut *in_plane.data;
 
             // Iter dst rows

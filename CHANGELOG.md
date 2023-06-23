@@ -1,3 +1,8 @@
+## Version 0.3.4
+
+- Fix cases of unsoundness (#14)
+- Slight optimizations for downsampling
+
 ## Version 0.3.3
 
 - Add `row_cropped` and `row_slice_cropped` methods to get rows without padding
