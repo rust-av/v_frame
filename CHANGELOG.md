@@ -1,3 +1,7 @@
+## Version 0.3.5
+
+- Bump num-derive to 0.4
+
 ## Version 0.3.4
 
 - Fix cases of unsoundness (#14)
