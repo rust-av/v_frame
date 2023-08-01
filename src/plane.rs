@@ -570,7 +570,37 @@ impl<T: Pixel> Plane<T> {
             )
         };
 
-        self.downscale_in_place::<2>(&mut new);
+        let width = new.cfg.width;
+        let height = new.cfg.height;
+
+        assert!(width * 2 <= src.cfg.stride - src.cfg.xorigin);
+        assert!(height * 2 <= src.cfg.alloc_height - src.cfg.yorigin);
+
+        let data_origin = src.data_origin();
+        for (row_idx, dst_row) in new
+            .mut_slice(PlaneOffset::default())
+            .rows_iter_mut()
+            .enumerate()
+            .take(height)
+        {
+            let src_top_row = &data_origin[(src.cfg.stride * row_idx * 2)..][..(2 * width)];
+            let src_bottom_row =
+                &data_origin[(src.cfg.stride * (row_idx * 2 + 1))..][..(2 * width)];
+
+            for ((dst, a), b) in dst_row
+                .iter_mut()
+                .zip(src_top_row.chunks_exact(2))
+                .zip(src_bottom_row.chunks_exact(2))
+            {
+                let sum = u32::cast_from(a[0])
+                    + u32::cast_from(a[1])
+                    + u32::cast_from(b[0])
+                    + u32::cast_from(b[1]);
+                let avg = (sum + 2) >> 2;
+                *dst = T::cast_from(avg);
+            }
+        }
+
         new.pad(frame_width, frame_height);
         new
     }

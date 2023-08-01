@@ -1,3 +1,7 @@
+## Version 0.3.6
+
+- Revert changes in downsampling in 0.3.4 which changed its behavior
+
 ## Version 0.3.5
 
 - Bump num-derive to 0.4
