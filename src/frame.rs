@@ -12,7 +12,7 @@ use crate::pixel::*;
 use crate::plane::*;
 use crate::serialize::{Deserialize, Serialize};
 
-// One video frame.
+/// Represents a raw video frame
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Frame<T: Pixel> {
     /// Planes constituting the frame.
