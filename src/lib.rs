@@ -84,24 +84,19 @@ pub mod pixel;
 pub mod plane;
 
 mod serialize {
-    cfg_if::cfg_if! {
-       if #[cfg(feature="serialize")] {
-         pub use serde::*;
-        } else {
-          pub use noop_proc_macro::{Deserialize, Serialize};
-       }
-    }
+    #[cfg(feature = "serialize")]
+    pub use serde::*;
+
+    #[cfg(not(feature = "serialize"))]
+    pub use noop_proc_macro::{Deserialize, Serialize};
 }
 
 mod wasm_bindgen {
-    cfg_if::cfg_if! {
-      // Only use wasm_bindgen with wasm32-unknown-unknown, not wasm32-wasi
-      if #[cfg(all(target_arch = "wasm32", target_os = "unknown"))] {
-        pub use wasm_bindgen::prelude::*;
-      } else {
-        pub use noop_proc_macro::wasm_bindgen;
-      }
-    }
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    pub use wasm_bindgen::prelude::*;
+
+    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+    pub use noop_proc_macro::wasm_bindgen;
 }
 
 pub mod prelude {

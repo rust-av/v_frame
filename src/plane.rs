@@ -121,15 +121,11 @@ impl<T: Pixel> std::ops::DerefMut for PlaneData<T> {
 }
 
 impl<T: Pixel> PlaneData<T> {
-    // Data alignment in bytes.
-    cfg_if::cfg_if! {
-      if #[cfg(target_arch = "wasm32")] {
-        // FIXME: wasm32 allocator fails for alignment larger than 3
-        const DATA_ALIGNMENT: usize = 1 << 3;
-      } else {
-        const DATA_ALIGNMENT: usize = 1 << 6;
-      }
-    }
+    #[cfg(target_arch = "wasm32")]
+    // FIXME: wasm32 allocator fails for alignment larger than 3
+    const DATA_ALIGNMENT: usize = 1 << 3;
+    #[cfg(not(target_arch = "wasm32"))]
+    const DATA_ALIGNMENT: usize = 1 << 6;
 
     pub fn new(len: usize) -> Self {
         Self {
