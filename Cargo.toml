@@ -17,7 +17,6 @@ tracing = [
 [dependencies]
 num-traits = "0.2"
 num-derive = "0.4"
-noop_proc_macro = "0.3.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
 profiling = { version = "1" }
 tracing = { version = "0.1.40", optional = true }

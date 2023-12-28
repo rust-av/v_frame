@@ -17,10 +17,13 @@ use aligned_vec::{ABox, AVec, ConstAlign};
 
 use crate::math::*;
 use crate::pixel::*;
-use crate::serialize::{Deserialize, Serialize};
+
+#[cfg(feature = "serialize")]
+use serde::{Deserialize, Serialize};
 
 /// Plane-specific configuration.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct PlaneConfig {
     /// Data stride.
     pub stride: usize,
@@ -147,7 +150,8 @@ impl<T: Pixel> PlaneData<T> {
 /// One data plane of a frame.
 ///
 /// For example, a plane can be a Y luma plane or a U or V chroma plane.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Plane<T: Pixel> {
     // TODO: it is used by encoder to copy by plane and by tiling, make it
     // private again once tiling is moved and a copy_plane fn is added.

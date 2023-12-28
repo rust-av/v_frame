@@ -10,10 +10,13 @@
 use crate::math::*;
 use crate::pixel::*;
 use crate::plane::*;
-use crate::serialize::{Deserialize, Serialize};
+
+#[cfg(feature = "serialize")]
+use serde::{Deserialize, Serialize};
 
 /// Represents a raw video frame
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Frame<T: Pixel> {
     /// Planes constituting the frame.
     pub planes: [Plane<T>; 3],
