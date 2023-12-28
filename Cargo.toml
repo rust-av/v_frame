@@ -10,7 +10,10 @@ repository = "https://github.com/rust-av/v_frame"
 [features]
 serialize = ["serde"]
 wasm = ["wasm-bindgen"]
-tracing = ["rust_hawktracer/profiling_enabled"]
+tracing = [
+  "profiling/profile-with-tracing",
+  "dep:tracing"
+]
 
 [dependencies]
 cfg-if = "1.0"
@@ -19,7 +22,8 @@ num-derive = "0.4"
 noop_proc_macro = "0.3.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
 wasm-bindgen = { version = "0.2.63", optional = true }
-rust_hawktracer = "0.7.0"
+profiling = { version = "1" }
+tracing = { version = "0.1.40", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

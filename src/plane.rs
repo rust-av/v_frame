@@ -7,7 +7,6 @@
 // Media Patent License 1.0 was not distributed with this source code in the
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
-use rust_hawktracer::*;
 use std::alloc::handle_alloc_error;
 use std::iter::FusedIterator;
 use std::marker::PhantomData;
@@ -622,7 +621,7 @@ impl<T: Pixel> Plane<T> {
     /// # Panics
     ///
     /// - If the current plane's width and height are not at least `SCALE` times the `in_plane`'s
-    #[hawktracer(downscale_in_place)]
+    #[profiling::function(downscale_in_place)]
     pub fn downscale_in_place<const SCALE: usize>(&self, in_plane: &mut Plane<T>) {
         let stride = in_plane.cfg.stride;
         let width = in_plane.cfg.width;
