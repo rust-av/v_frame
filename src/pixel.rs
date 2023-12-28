@@ -7,8 +7,8 @@
 // Media Patent License 1.0 was not distributed with this source code in the
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
-use crate::serialize::{Deserialize, Serialize};
-use crate::wasm_bindgen::*;
+#[cfg(feature = "serialize")]
+use serde::{Serialize, Deserialize};
 
 use num_derive::FromPrimitive;
 use num_traits::{AsPrimitive, PrimInt, Signed};
@@ -146,8 +146,8 @@ impl Coefficient for i32 {
 }
 
 /// Chroma subsampling format
-#[wasm_bindgen]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, FromPrimitive, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, FromPrimitive)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[repr(C)]
 pub enum ChromaSampling {
     /// Both vertically and horizontally subsampled.
