@@ -54,7 +54,7 @@ fn plane(c: &mut Criterion) {
         })
     });
 
-    let p = Plane::<u8>::new(
+    let p8b = Plane::<u8>::new(
         black_box(640),
         black_box(480),
         black_box(1),
@@ -62,16 +62,27 @@ fn plane(c: &mut Criterion) {
         black_box(0),
         black_box(0),
     );
+
+    // We need to use PerIteration because we modify the Plane every iteration
+    let batch_size = criterion::BatchSize::PerIteration;
+
+    c.bench_function("plane clone", |b| b.iter(|| p8b.clone()));
+
     c.bench_function("plane pad", |b| {
-        b.iter(|| p.clone().pad(black_box(680), black_box(520)))
+        b.iter_batched_ref(
+            || p8b.clone(),
+            |p| p.pad(black_box(680), black_box(520)),
+            batch_size,
+        )
     });
 
     let data_8b: Vec<u8> = vec![2; 640 * 480];
     c.bench_function("plane copy_from_raw_u8 8-bit", |b| {
-        b.iter(|| {
-            p.clone()
-                .copy_from_raw_u8(black_box(&data_8b), black_box(640), black_box(1))
-        })
+        b.iter_batched_ref(
+            || p8b.clone(),
+            |p| p.copy_from_raw_u8(black_box(&data_8b), black_box(640), black_box(1)),
+            batch_size,
+        )
     });
 
     let p10b = Plane::<u16>::new(
@@ -84,23 +95,24 @@ fn plane(c: &mut Criterion) {
     );
     let data_10b: Vec<u8> = vec![2; 640 * 480 * 2];
     c.bench_function("plane copy_from_raw_u8 10-bit", |b| {
-        b.iter(|| {
-            p10b.clone()
-                .copy_from_raw_u8(black_box(&data_10b), black_box(640), black_box(2))
-        })
+        b.iter_batched_ref(
+            || p10b.clone(),
+            |p| p.copy_from_raw_u8(black_box(&data_10b), black_box(640), black_box(2)),
+            batch_size,
+        )
     });
 
     c.bench_function("plane downsampled", |b| {
-        b.iter(|| p.downsampled(black_box(320), black_box(240)))
+        b.iter(|| p8b.downsampled(black_box(320), black_box(240)))
     });
 
-    c.bench_function("plane downscale", |b| b.iter(|| p.downscale::<2>()));
+    c.bench_function("plane downscale", |b| b.iter(|| p8b.downscale::<2>()));
 
     // This may seem silly to benchmark, but there is some math in the iterator
     // that has been known to hinder compiler optimizations
     c.bench_function("plane rows_iter", |b| {
         b.iter(|| {
-            p.rows_iter()
+            p8b.rows_iter()
                 .map(|r| r.iter().map(|v| u8::cast_from(*v) as u64).sum::<u64>())
                 .collect::<Vec<_>>()
         })
