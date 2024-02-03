@@ -103,7 +103,7 @@ pub struct PlaneOffset {
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(not(feature = "serialize"), derive(Serialize, Deserialize))]
 pub struct PlaneData<T: Pixel> {
-    ptr: std::ptr::NonNull<T>,
+    ptr: Option<std::ptr::NonNull<T>>, // None when len == 0
     _marker: PhantomData<T>,
     len: usize,
 }
@@ -126,9 +126,12 @@ impl<T: Pixel> std::ops::Deref for PlaneData<T> {
     type Target = [T];
 
     fn deref(&self) -> &[T] {
+        let Some(ptr) = self.ptr else {
+            return &[];
+        };
         // SAFETY: we cannot reference out of bounds because we know the length of the data
         unsafe {
-            let p = self.ptr.as_ptr();
+            let p = ptr.as_ptr();
 
             std::slice::from_raw_parts(p, self.len)
         }
@@ -137,9 +140,12 @@ impl<T: Pixel> std::ops::Deref for PlaneData<T> {
 
 impl<T: Pixel> std::ops::DerefMut for PlaneData<T> {
     fn deref_mut(&mut self) -> &mut [T] {
+        let Some(ptr) = self.ptr else {
+            return &mut [];
+        };
         // SAFETY: we cannot reference out of bounds because we know the length of the data
         unsafe {
-            let p = self.ptr.as_ptr();
+            let p = ptr.as_ptr();
 
             std::slice::from_raw_parts_mut(p, self.len)
         }
@@ -149,8 +155,10 @@ impl<T: Pixel> std::ops::DerefMut for PlaneData<T> {
 impl<T: Pixel> std::ops::Drop for PlaneData<T> {
     fn drop(&mut self) {
         // SAFETY: we cannot dealloc too much because we know the length of the data
-        unsafe {
-            dealloc(self.ptr.as_ptr() as *mut u8, Self::layout(self.len));
+        if let Some(ptr) = self.ptr {
+            unsafe {
+                dealloc(ptr.as_ptr() as *mut u8, Self::layout(self.len));
+            }
         }
     }
 }
@@ -200,13 +208,15 @@ impl<T: Pixel> PlaneData<T> {
     }
 
     unsafe fn new_uninitialized(len: usize) -> Self {
-        let ptr = {
+        let ptr = if len == 0 {
+            None
+        } else {
             let layout = Self::layout(len);
             let ptr = alloc(layout) as *mut T;
             if ptr.is_null() {
                 handle_alloc_error(layout);
             }
-            std::ptr::NonNull::new_unchecked(ptr)
+            Some(std::ptr::NonNull::new_unchecked(ptr))
         };
 
         PlaneData {
@@ -1051,6 +1061,11 @@ pub mod test {
         println!("{:?}", &plane.data[..10]);
 
         assert_eq!(&output[..64], &plane.data[..64]);
+    }
+    #[test]
+    fn test_plane_zero_len() {
+        let plane = Plane::<u8>::new(0, 0, 0, 0, 0, 0);
+        assert_eq!(plane.data.len(), 0);
     }
 
     #[test]
