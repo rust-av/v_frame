@@ -102,9 +102,9 @@ pub struct PlaneOffset {
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct PlaneData<T: Pixel> {
     #[cfg(not(target_arch = "wasm32"))]
-    data: AVec<T, ConstAlign<{ 1 << 6 }>>,
+    data: ABox<[T], ConstAlign<{ 1 << 6 }>>,
     #[cfg(target_arch = "wasm32")]
-    data: AVec<T, ConstAlign<{ 1 << 3 }>>,
+    data: ABox<[T], ConstAlign<{ 1 << 3 }>>,
 }
 
 unsafe impl<T: Pixel + Send> Send for PlaneData<T> {}
@@ -140,13 +140,14 @@ impl<T: Pixel> PlaneData<T> {
             data: AVec::from_iter(
                 Self::DATA_ALIGNMENT,
                 iter::repeat(T::cast_from(0)).take(len),
-            ),
+            )
+            .into_boxed_slice(),
         }
     }
 
     fn from_slice(data: &[T]) -> Self {
         Self {
-            data: AVec::from_slice(Self::DATA_ALIGNMENT, data),
+            data: AVec::from_slice(Self::DATA_ALIGNMENT, data).into_boxed_slice(),
         }
     }
 }
