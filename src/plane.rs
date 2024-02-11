@@ -1060,6 +1060,10 @@ pub mod test {
     fn test_plane_zero_len() {
         let plane = Plane::<u8>::new(0, 0, 0, 0, 0, 0);
         assert_eq!(plane.data.len(), 0);
+        assert_eq!(*plane.data, []);
+        let copy = plane.clone();
+        assert_eq!(copy.data.len(), 0);
+        assert_eq!(*copy.data, []);
     }
 
     #[test]
