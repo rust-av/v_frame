@@ -7,19 +7,17 @@
 // Media Patent License 1.0 was not distributed with this source code in the
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
-use std::alloc::handle_alloc_error;
 use std::iter::FusedIterator;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Index, IndexMut, Range};
-use std::{
-    alloc::{alloc, dealloc, Layout},
-    u32,
-};
+use std::u32;
 use std::{
     fmt::{Debug, Display, Formatter},
     usize,
 };
+
+use aligned_vec::{avec_rt, AVec, RuntimeAlign};
 
 use crate::math::*;
 use crate::pixel::*;
@@ -100,86 +98,26 @@ pub struct PlaneOffset {
 ///
 /// The buffer is padded and aligned according to the architecture-specific
 /// SIMD constraints.
-#[derive(Debug, PartialEq, Eq)]
-#[cfg_attr(not(feature = "serialize"), derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct PlaneData<T: Pixel> {
-    ptr: std::ptr::NonNull<T>,
-    _marker: PhantomData<T>,
-    len: usize,
+    data: AVec<T, RuntimeAlign>,
 }
 
 unsafe impl<T: Pixel + Send> Send for PlaneData<T> {}
 unsafe impl<T: Pixel + Sync> Sync for PlaneData<T> {}
 
-impl<T: Pixel> Clone for PlaneData<T> {
-    fn clone(&self) -> Self {
-        // SAFETY: we initialize the plane data before returning
-        let mut pd = unsafe { Self::new_uninitialized(self.len) };
-
-        pd.copy_from_slice(self);
-
-        pd
-    }
-}
-
 impl<T: Pixel> std::ops::Deref for PlaneData<T> {
     type Target = [T];
 
     fn deref(&self) -> &[T] {
-        // SAFETY: we cannot reference out of bounds because we know the length of the data
-        unsafe {
-            let p = self.ptr.as_ptr();
-
-            std::slice::from_raw_parts(p, self.len)
-        }
+        self.data.as_slice()
     }
 }
 
 impl<T: Pixel> std::ops::DerefMut for PlaneData<T> {
     fn deref_mut(&mut self) -> &mut [T] {
-        // SAFETY: we cannot reference out of bounds because we know the length of the data
-        unsafe {
-            let p = self.ptr.as_ptr();
-
-            std::slice::from_raw_parts_mut(p, self.len)
-        }
-    }
-}
-
-impl<T: Pixel> std::ops::Drop for PlaneData<T> {
-    fn drop(&mut self) {
-        // SAFETY: we cannot dealloc too much because we know the length of the data
-        unsafe {
-            dealloc(self.ptr.as_ptr() as *mut u8, Self::layout(self.len));
-        }
-    }
-}
-
-#[cfg(feature = "serialize")]
-impl<T: Pixel + Serialize> Serialize for PlaneData<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeSeq;
-        use std::ops::Deref;
-
-        let mut data = serializer.serialize_seq(Some(self.len))?;
-        for byte in self.deref() {
-            data.serialize_element(&byte)?;
-        }
-        data.end()
-    }
-}
-
-#[cfg(feature = "serialize")]
-impl<'de, T: Pixel + Deserialize<'de>> Deserialize<'de> for PlaneData<T> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as serde::Deserializer<'de>>::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let deserialized = Vec::deserialize(deserializer)?;
-        Ok(Self::from_slice(&deserialized))
+        self.data.as_mut_slice()
     }
 }
 
@@ -188,52 +126,22 @@ impl<T: Pixel> PlaneData<T> {
     cfg_if::cfg_if! {
       if #[cfg(target_arch = "wasm32")] {
         // FIXME: wasm32 allocator fails for alignment larger than 3
-        const DATA_ALIGNMENT_LOG2: usize = 3;
+        const DATA_ALIGNMENT: usize = 1 << 3;
       } else {
-        const DATA_ALIGNMENT_LOG2: usize = 6;
+        const DATA_ALIGNMENT: usize = 1 << 6;
       }
     }
 
-    unsafe fn layout(len: usize) -> Layout {
-        Layout::from_size_align(len * mem::size_of::<T>(), 1 << Self::DATA_ALIGNMENT_LOG2)
-            .expect("layout size too large")
-    }
-
-    unsafe fn new_uninitialized(len: usize) -> Self {
-        let ptr = {
-            let layout = Self::layout(len);
-            let ptr = alloc(layout) as *mut T;
-            if ptr.is_null() {
-                handle_alloc_error(layout);
-            }
-            std::ptr::NonNull::new_unchecked(ptr)
-        };
-
-        PlaneData {
-            ptr,
-            len,
-            _marker: PhantomData,
-        }
-    }
-
     pub fn new(len: usize) -> Self {
-        // SAFETY: we initialize the plane data before returning
-        let mut pd = unsafe { Self::new_uninitialized(len) };
-
-        for v in pd.iter_mut() {
-            *v = T::cast_from(128);
+        Self {
+            data: avec_rt!([Self::DATA_ALIGNMENT]| T::cast_from(0); len),
         }
-
-        pd
     }
 
     fn from_slice(data: &[T]) -> Self {
-        // SAFETY: we initialize the plane data before returning
-        let mut pd = unsafe { Self::new_uninitialized(data.len()) };
-
-        pd.copy_from_slice(data);
-
-        pd
+        Self {
+            data: AVec::from_slice(Self::DATA_ALIGNMENT, data),
+        }
     }
 }
 
@@ -275,21 +183,6 @@ impl<T: Pixel> Plane<T> {
     ) -> Self {
         let cfg = PlaneConfig::new(width, height, xdec, ydec, xpad, ypad, mem::size_of::<T>());
         let data = PlaneData::new(cfg.stride * cfg.alloc_height);
-
-        Plane { data, cfg }
-    }
-
-    /// Allocates and returns an uninitialized plane.
-    unsafe fn new_uninitialized(
-        width: usize,
-        height: usize,
-        xdec: usize,
-        ydec: usize,
-        xpad: usize,
-        ypad: usize,
-    ) -> Self {
-        let cfg = PlaneConfig::new(width, height, xdec, ydec, xpad, ypad, mem::size_of::<T>());
-        let data = PlaneData::new_uninitialized(cfg.stride * cfg.alloc_height);
 
         Plane { data, cfg }
     }
@@ -557,17 +450,14 @@ impl<T: Pixel> Plane<T> {
     /// - If the requested width and height are > half the input width or height
     pub fn downsampled(&self, frame_width: usize, frame_height: usize) -> Plane<T> {
         let src = self;
-        // SAFETY: all pixels initialized in this function
-        let mut new = unsafe {
-            Plane::new_uninitialized(
-                (src.cfg.width + 1) / 2,
-                (src.cfg.height + 1) / 2,
-                src.cfg.xdec + 1,
-                src.cfg.ydec + 1,
-                src.cfg.xpad / 2,
-                src.cfg.ypad / 2,
-            )
-        };
+        let mut new = Plane::new(
+            (src.cfg.width + 1) / 2,
+            (src.cfg.height + 1) / 2,
+            src.cfg.xdec + 1,
+            src.cfg.ydec + 1,
+            src.cfg.xpad / 2,
+            src.cfg.ypad / 2,
+        );
 
         let width = new.cfg.width;
         let height = new.cfg.height;
@@ -606,10 +496,7 @@ impl<T: Pixel> Plane<T> {
 
     /// Returns a plane downscaled from the source plane by a factor of `scale` (not padded)
     pub fn downscale<const SCALE: usize>(&self) -> Plane<T> {
-        // SAFETY: all pixels initialized when `downscale_in_place` is called
-        let mut new_plane = unsafe {
-            Plane::new_uninitialized(self.cfg.width / SCALE, self.cfg.height / SCALE, 0, 0, 0, 0)
-        };
+        let mut new_plane = Plane::new(self.cfg.width / SCALE, self.cfg.height / SCALE, 0, 0, 0, 0);
 
         self.downscale_in_place::<SCALE>(&mut new_plane);
 
