@@ -139,7 +139,7 @@ impl<T: Pixel> PlaneData<T> {
         Self {
             data: AVec::from_iter(
                 Self::DATA_ALIGNMENT,
-                iter::repeat(T::cast_from(0)).take(len),
+                iter::repeat(T::cast_from(128)).take(len),
             )
             .into_boxed_slice(),
         }
