@@ -7,7 +7,7 @@
 // Media Patent License 1.0 was not distributed with this source code in the
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
-use std::iter::FusedIterator;
+use std::iter::{self, FusedIterator};
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Index, IndexMut, Range};
@@ -17,7 +17,7 @@ use std::{
     usize,
 };
 
-use aligned_vec::{avec_rt, AVec, RuntimeAlign};
+use aligned_vec::{ABox, AVec, ConstAlign};
 
 use crate::math::*;
 use crate::pixel::*;
@@ -101,7 +101,10 @@ pub struct PlaneOffset {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct PlaneData<T: Pixel> {
-    data: AVec<T, RuntimeAlign>,
+    #[cfg(not(target_arch = "wasm32"))]
+    data: AVec<T, ConstAlign<{ 1 << 6 }>>,
+    #[cfg(target_arch = "wasm32")]
+    data: AVec<T, ConstAlign<{ 1 << 3 }>>,
 }
 
 unsafe impl<T: Pixel + Send> Send for PlaneData<T> {}
@@ -111,13 +114,13 @@ impl<T: Pixel> std::ops::Deref for PlaneData<T> {
     type Target = [T];
 
     fn deref(&self) -> &[T] {
-        self.data.as_slice()
+        self.data.as_ref()
     }
 }
 
 impl<T: Pixel> std::ops::DerefMut for PlaneData<T> {
     fn deref_mut(&mut self) -> &mut [T] {
-        self.data.as_mut_slice()
+        self.data.as_mut()
     }
 }
 
@@ -134,7 +137,10 @@ impl<T: Pixel> PlaneData<T> {
 
     pub fn new(len: usize) -> Self {
         Self {
-            data: avec_rt!([Self::DATA_ALIGNMENT]| T::cast_from(0); len),
+            data: AVec::from_iter(
+                Self::DATA_ALIGNMENT,
+                iter::repeat(T::cast_from(0)).take(len),
+            ),
         }
     }
 
