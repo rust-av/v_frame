@@ -7,15 +7,11 @@
 // Media Patent License 1.0 was not distributed with this source code in the
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
+use std::fmt::{Debug, Display, Formatter};
 use std::iter::{self, FusedIterator};
 use std::marker::PhantomData;
-use std::mem;
+use std::mem::size_of;
 use std::ops::{Index, IndexMut, Range};
-use std::u32;
-use std::{
-    fmt::{Debug, Display, Formatter},
-    usize,
-};
 
 use aligned_vec::{ABox, AVec, ConstAlign};
 
@@ -188,7 +184,7 @@ impl<T: Pixel> Plane<T> {
         xpad: usize,
         ypad: usize,
     ) -> Self {
-        let cfg = PlaneConfig::new(width, height, xdec, ydec, xpad, ypad, mem::size_of::<T>());
+        let cfg = PlaneConfig::new(width, height, xdec, ydec, xpad, ypad, size_of::<T>());
         let data = PlaneData::new(cfg.stride * cfg.alloc_height);
 
         Plane { data, cfg }
@@ -377,7 +373,7 @@ impl<T: Pixel> Plane<T> {
                 }
                 2 => {
                     assert!(
-                        mem::size_of::<T>() == 2,
+                        size_of::<T>() == 2,
                         "source bytewidth ({}) cannot fit in Plane<u8>",
                         source_bytewidth
                     );
@@ -424,7 +420,7 @@ impl<T: Pixel> Plane<T> {
                 }
                 2 => {
                     assert!(
-                        mem::size_of::<T>() >= 2,
+                        size_of::<T>() >= 2,
                         "dest bytewidth ({}) cannot fit in Plane<u8>",
                         dest_bytewidth
                     );
