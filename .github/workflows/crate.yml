@@ -9,6 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  GRCOV_VERSION: v0.8.19
 
 jobs:
   build:
@@ -51,16 +52,12 @@ jobs:
         components: llvm-tools-preview
 
     - name: Install grcov
-      env:
-        GRCOV_LINK: https://github.com/mozilla/grcov/releases/download
-        GRCOV_VERSION: v0.8.19
-      run: |
-        curl -L "$GRCOV_LINK/$GRCOV_VERSION/grcov-x86_64-unknown-linux-musl.tar.bz2" |
-        tar xj -C $HOME/.cargo/bin
+      run: >
+        curl -L "https://github.com/mozilla/grcov/releases/download/$GRCOV_VERSION/grcov-x86_64-unknown-linux-musl.tar.bz2"
+        | tar xj -C "$HOME/.cargo/bin"
 
     - name: Run cargo clean
-      run: |
-        cargo clean
+      run: cargo clean
 
     - name: Run tests
       env:
@@ -71,8 +68,7 @@ jobs:
         RUSTDOCFLAGS: >
           -Cinstrument-coverage -Ccodegen-units=1 -Clink-dead-code
           -Coverflow-checks=off
-      run: |
-        cargo test --verbose
+      run: cargo test
     - name: Get coverage data for codecov
       run: |
         grcov . --binary-path ./target/debug/ -s . -t lcov --branch \
