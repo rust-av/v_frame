@@ -28,7 +28,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Install Rust nightly and miri
-      runs: >
+      run: >
         rustup toolchain install
         --no-self-update
         --profile minimal
@@ -52,7 +52,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Install Rust stable and LLVM tools
-      runs: >
+      run: >
         rustup toolchain install
         --no-self-update
         --profile minimal
