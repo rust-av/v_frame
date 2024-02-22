@@ -34,6 +34,7 @@ jobs:
         --profile minimal
         -c rust-src
         -c miri
+        --
         nightly
 
         rustup default nightly
@@ -58,6 +59,7 @@ jobs:
         --profile minimal
         --allow-downgrade
         -c llvm-tools-preview
+        --
         stable
 
         rustup default stable
