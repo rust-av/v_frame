@@ -74,6 +74,7 @@ jobs:
         grcov . --binary-path ./target/debug/ -s . -t lcov --branch \
               --ignore-not-existing --ignore "/*" --ignore "../*" -o lcov.info
     - name: Codecov upload
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
+        token: ${{ secrets.CODECOV_TOKEN }}
         files: lcov.info
