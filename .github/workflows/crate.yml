@@ -52,9 +52,9 @@ jobs:
         components: llvm-tools-preview
 
     - name: Install grcov
-      run: >
-        curl -L "https://github.com/mozilla/grcov/releases/download/$GRCOV_VERSION/grcov-x86_64-unknown-linux-musl.tar.bz2"
-        | tar xj -C "$HOME/.cargo/bin"
+      run: |
+        curl -L "https://github.com/mozilla/grcov/releases/download/$GRCOV_VERSION/grcov-x86_64-unknown-linux-musl.tar.bz2" | \
+        tar xj -C "$HOME/.cargo/bin"
 
     - name: Run cargo clean
       run: cargo clean
