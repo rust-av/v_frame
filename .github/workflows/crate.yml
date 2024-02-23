@@ -61,7 +61,7 @@ jobs:
 
     - name: Run tests
       env:
-        LLVM_PROFILE_FILE: "{{ name }}-%p-%m.profraw"
+        LLVM_PROFILE_FILE: "v_frame-%p-%m.profraw"
         RUSTFLAGS: >
           -Cinstrument-coverage -Ccodegen-units=1 -Clink-dead-code
           -Coverflow-checks=off
