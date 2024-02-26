@@ -95,7 +95,8 @@ mod serialize {
 
 mod wasm_bindgen {
     cfg_if::cfg_if! {
-      if #[cfg(feature="wasm")] {
+      // Only use wasm_bindgen with wasm32-unknown-unknown, not wasm32-wasi
+      if #[cfg(all(target_arch = "wasm32", target_os = "unknown"))] {
         pub use wasm_bindgen::prelude::*;
       } else {
         pub use noop_proc_macro::wasm_bindgen;

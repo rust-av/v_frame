@@ -895,6 +895,13 @@ impl<'a, T: Pixel> IndexMut<usize> for PlaneMutSlice<'a, T> {
 pub mod test {
     use super::*;
 
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::*;
+
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    wasm_bindgen_test_configure!(run_in_browser);
+
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
     #[test]
     fn copy_from_raw_u8() {
         #[rustfmt::skip]
@@ -919,6 +926,7 @@ pub mod test {
         assert_eq!(&input[..64], &plane.data[..64]);
     }
 
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
     #[test]
     fn copy_to_raw_u8() {
         #[rustfmt::skip]
@@ -943,6 +951,7 @@ pub mod test {
         assert_eq!(&output[..64], &plane.data[..64]);
     }
 
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
     #[test]
     fn test_plane_downsample() {
         #[rustfmt::skip]
@@ -983,6 +992,8 @@ pub mod test {
 
         assert_eq!(&expected[..], &v[..]);
     }
+
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
     #[test]
     fn test_plane_downsample_odd() {
         #[rustfmt::skip]
@@ -1023,6 +1034,7 @@ pub mod test {
         assert_eq!(&expected[..], &v[..]);
     }
 
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
     #[test]
     fn test_plane_downscale() {
         #[rustfmt::skip]
@@ -1063,6 +1075,7 @@ pub mod test {
         assert_eq!(&expected[..], &v[..]);
     }
 
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
     #[test]
     fn test_plane_downscale_odd() {
         #[rustfmt::skip]
@@ -1102,6 +1115,7 @@ pub mod test {
         assert_eq!(&expected[..], &v[..]);
     }
 
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
     #[test]
     fn test_plane_downscale_odd_2() {
         #[rustfmt::skip]
@@ -1144,6 +1158,7 @@ pub mod test {
         assert_eq!(&expected[..], &v[..]);
     }
 
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
     #[test]
     fn test_plane_pad() {
         #[rustfmt::skip]
@@ -1191,6 +1206,7 @@ pub mod test {
     );
     }
 
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
     #[test]
     fn test_pixel_iterator() {
         #[rustfmt::skip]
