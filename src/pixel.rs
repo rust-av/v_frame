@@ -10,8 +10,7 @@
 #[cfg(feature = "serialize")]
 use serde::{Serialize, Deserialize};
 
-use num_derive::FromPrimitive;
-use num_traits::{AsPrimitive, PrimInt, Signed};
+use num_traits::{AsPrimitive, FromPrimitive, PrimInt, Signed};
 
 use std::fmt;
 use std::fmt::{Debug, Display};
@@ -146,7 +145,7 @@ impl Coefficient for i32 {
 }
 
 /// Chroma subsampling format
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, FromPrimitive)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[repr(C)]
 pub enum ChromaSampling {
@@ -159,6 +158,24 @@ pub enum ChromaSampling {
     Cs444,
     /// Monochrome.
     Cs400,
+}
+
+impl FromPrimitive for ChromaSampling {
+    fn from_i64(n: i64) -> Option<Self> {
+        use ChromaSampling::*;
+
+        match n {
+            n if n == Cs420 as i64 => Some(Cs420),
+            n if n == Cs422 as i64 => Some(Cs422),
+            n if n == Cs444 as i64 => Some(Cs444),
+            n if n == Cs400 as i64 => Some(Cs400),
+            _ => None,
+        }
+    }
+
+    fn from_u64(n: u64) -> Option<Self> {
+        ChromaSampling::from_i64(n as i64)
+    }
 }
 
 impl fmt::Display for ChromaSampling {
