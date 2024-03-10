@@ -511,7 +511,7 @@ impl<T: Pixel> Plane<T> {
     /// # Panics
     ///
     /// - If the current plane's width and height are not at least `SCALE` times the `in_plane`'s
-    #[profiling::function(downscale_in_place)]
+    #[cfg_attr(feature = "profiling", profiling::function(downscale_in_place))]
     pub fn downscale_in_place<const SCALE: usize>(&self, in_plane: &mut Plane<T>) {
         let stride = in_plane.cfg.stride;
         let width = in_plane.cfg.width;
