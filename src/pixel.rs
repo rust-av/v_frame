@@ -228,6 +228,13 @@ impl ChromaSampling {
 mod test {
     use super::*;
 
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::*;
+
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    wasm_bindgen_test_configure!(run_in_browser);
+
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
     #[test]
     fn chroma_sampling_from_int() {
         let expected = [
