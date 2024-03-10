@@ -10,6 +10,9 @@
 #[cfg(feature = "serialize")]
 use serde::{Serialize, Deserialize};
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+use wasm_bindgen::prelude::*;
+
 use num_traits::{AsPrimitive, FromPrimitive, PrimInt, Signed};
 
 use std::fmt;
@@ -147,6 +150,7 @@ impl Coefficient for i32 {
 /// Chroma subsampling format
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen)]
 #[repr(C)]
 pub enum ChromaSampling {
     /// Both vertically and horizontally subsampled.
