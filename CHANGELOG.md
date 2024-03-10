@@ -1,3 +1,14 @@
+## Version 0.3.8
+
+- Eliminate unsound code
+- Remove several unnecessary dependencies
+- Internal refactoring
+
+## Version 0.3.7
+
+- Add documentation for `Frame` struct
+- Replace `hawktracer` with `tracing` crate
+
 ## Version 0.3.6
 
 - Revert changes in downsampling in 0.3.4 which changed its behavior
