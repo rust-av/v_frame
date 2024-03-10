@@ -223,3 +223,29 @@ impl ChromaSampling {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn chroma_sampling_from_int() {
+        let expected = [
+            (-1, None),
+            (0, Some(ChromaSampling::Cs420)),
+            (1, Some(ChromaSampling::Cs422)),
+            (2, Some(ChromaSampling::Cs444)),
+            (3, Some(ChromaSampling::Cs400)),
+            (4, None),
+        ];
+
+        for (int, chroma_sampling) in expected {
+            let converted = ChromaSampling::from_i32(int);
+            assert_eq!(chroma_sampling, converted);
+
+            let converted_uint = ChromaSampling::from_u32(int as u32);
+            assert_eq!(chroma_sampling, converted_uint, "FromPrimitive does not return the same result for i32 and u32");
+        }
+    }
+}
+
