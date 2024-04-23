@@ -8,7 +8,7 @@
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
 #[cfg(feature = "serialize")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 use wasm_bindgen::prelude::*;
@@ -110,7 +110,6 @@ pub trait Pixel:
 
     /// Converts stride in pixels to stride in bytes.
     #[inline]
-    #[allow(clippy::wrong_self_convention)]
     fn to_asm_stride(in_stride: usize) -> isize {
         (in_stride * size_of::<Self>()) as isize
     }
@@ -240,6 +239,24 @@ mod test {
 
     #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
     #[test]
+    fn asm_stride() {
+        let tests = [(7, 7, 14), (12, 12, 24), (1234, 1234, 2468)];
+
+        for (in_stride, u8_bytes, u16_bytes) in tests {
+            assert_eq!(u8::to_asm_stride(in_stride), u8_bytes);
+            assert_eq!(u16::to_asm_stride(in_stride), u16_bytes);
+        }
+    }
+
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
+    #[test]
+    fn type_enum() {
+        assert!(u8::type_enum() == PixelType::U8);
+        assert!(u16::type_enum() == PixelType::U16);
+    }
+
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
+    #[test]
     fn chroma_sampling_from_int() {
         let expected = [
             (-1, None),
@@ -255,8 +272,45 @@ mod test {
             assert_eq!(chroma_sampling, converted);
 
             let converted_uint = ChromaSampling::from_u32(int as u32);
-            assert_eq!(chroma_sampling, converted_uint, "FromPrimitive does not return the same result for i32 and u32");
+            assert_eq!(chroma_sampling, converted_uint);
+        }
+    }
+
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
+    #[test]
+    fn display_chroma_sampling() {
+        use std::fmt::Write;
+
+        let all_cs = [
+            (ChromaSampling::Cs420, "4:2:0"),
+            (ChromaSampling::Cs422, "4:2:2"),
+            (ChromaSampling::Cs444, "4:4:4"),
+            (ChromaSampling::Cs400, "Monochrome"),
+        ];
+
+        for (cs, expected) in all_cs {
+            let mut s = String::new();
+            write!(&mut s, "{cs}").expect("can display");
+            assert_eq!(&s, expected);
+        }
+    }
+
+    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
+    #[test]
+    fn chroma_sampling_dimensions() {
+        let tests = [
+            ((1024, 768), ChromaSampling::Cs444, (1024, 768)),
+            ((1024, 768), ChromaSampling::Cs422, (512, 768)),
+            ((1024, 768), ChromaSampling::Cs420, (512, 384)),
+            ((1024, 768), ChromaSampling::Cs400, (0, 0)),
+            // Check odd width/height
+            ((1023, 768), ChromaSampling::Cs422, (512, 768)),
+            ((1023, 767), ChromaSampling::Cs420, (512, 384)),
+        ];
+
+        for (luma, cs, expected_chroma) in tests {
+            let chroma = cs.get_chroma_dimensions(luma.0, luma.1);
+            assert_eq!(chroma, expected_chroma);
         }
     }
 }
-
