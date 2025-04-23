@@ -631,7 +631,7 @@ impl<'a, T: Pixel> PlaneIter<'a, T> {
     }
 }
 
-impl<'a, T: Pixel> Iterator for PlaneIter<'a, T> {
+impl<T: Pixel> Iterator for PlaneIter<'_, T> {
     type Item = T;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
@@ -690,8 +690,8 @@ impl<'a, T: Pixel> Iterator for RowsIter<'a, T> {
     }
 }
 
-impl<'a, T: Pixel> ExactSizeIterator for RowsIter<'a, T> {}
-impl<'a, T: Pixel> FusedIterator for RowsIter<'a, T> {}
+impl<T: Pixel> ExactSizeIterator for RowsIter<'_, T> {}
+impl<T: Pixel> FusedIterator for RowsIter<'_, T> {}
 
 impl<'a, T: Pixel> PlaneSlice<'a, T> {
     #[allow(unused)]
@@ -796,7 +796,7 @@ impl<'a, T: Pixel> PlaneSlice<'a, T> {
     }
 }
 
-impl<'a, T: Pixel> Index<usize> for PlaneSlice<'a, T> {
+impl<T: Pixel> Index<usize> for PlaneSlice<'_, T> {
     type Output = [T];
     fn index(&self, index: usize) -> &Self::Output {
         let range = self.plane.row_range(self.x, self.y + index as isize);
@@ -844,10 +844,10 @@ impl<'a, T: Pixel> Iterator for RowsIterMut<'a, T> {
     }
 }
 
-impl<'a, T: Pixel> ExactSizeIterator for RowsIterMut<'a, T> {}
-impl<'a, T: Pixel> FusedIterator for RowsIterMut<'a, T> {}
+impl<T: Pixel> ExactSizeIterator for RowsIterMut<'_, T> {}
+impl<T: Pixel> FusedIterator for RowsIterMut<'_, T> {}
 
-impl<'a, T: Pixel> PlaneMutSlice<'a, T> {
+impl<T: Pixel> PlaneMutSlice<'_, T> {
     #[allow(unused)]
     pub fn rows_iter(&self) -> RowsIter<'_, T> {
         RowsIter {
@@ -876,7 +876,7 @@ impl<'a, T: Pixel> PlaneMutSlice<'a, T> {
     }
 }
 
-impl<'a, T: Pixel> Index<usize> for PlaneMutSlice<'a, T> {
+impl<T: Pixel> Index<usize> for PlaneMutSlice<'_, T> {
     type Output = [T];
     fn index(&self, index: usize) -> &Self::Output {
         let range = self.plane.row_range(self.x, self.y + index as isize);
@@ -884,7 +884,7 @@ impl<'a, T: Pixel> Index<usize> for PlaneMutSlice<'a, T> {
     }
 }
 
-impl<'a, T: Pixel> IndexMut<usize> for PlaneMutSlice<'a, T> {
+impl<T: Pixel> IndexMut<usize> for PlaneMutSlice<'_, T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         let range = self.plane.row_range(self.x, self.y + index as isize);
         &mut self.plane.data[range]
