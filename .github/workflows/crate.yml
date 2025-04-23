@@ -9,18 +9,24 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  GRCOV_VERSION: v0.8.19
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
+        run: cargo test --verbose
+      - name: Install cargo-msrv
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-msrv
+      - name: Validate minimum Rust version
+        run: |
+          cargo msrv verify
 
   test-wasm:
     runs-on: ubuntu-latest
@@ -43,55 +49,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install Rust nightly and miri
-      uses: dtolnay/rust-toolchain@nightly
-      with:
-        components: miri, rust-src
+      - name: Install Rust nightly and miri
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri, rust-src
 
-    - name: Run miri
-      env:
-        RUSTFLAGS: -Zrandomize-layout
-        MIRIFLAGS: -Zmiri-symbolic-alignment-check
-      run: cargo miri test
+      - name: Run miri
+        env:
+          RUSTFLAGS: -Zrandomize-layout
+          MIRIFLAGS: -Zmiri-symbolic-alignment-check
+        run: cargo miri test
 
   code-coverage:
-    needs: [miri, build]
+    needs: [ miri, build ]
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install Rust stable and LLVM tools
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: llvm-tools-preview
+      - name: Install Rust stable and LLVM tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
 
-    - name: Install grcov
-      run: |
-        curl -L "https://github.com/mozilla/grcov/releases/download/$GRCOV_VERSION/grcov-x86_64-unknown-linux-musl.tar.bz2" | \
-        tar xj -C "$HOME/.cargo/bin"
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
 
-    - name: Run cargo clean
-      run: cargo clean
+      - name: Generate code coverage
+        run: cargo llvm-cov --lcov --output-path lcov.log
 
-    - name: Run tests
-      env:
-        LLVM_PROFILE_FILE: "v_frame-%p-%m.profraw"
-        RUSTFLAGS: >
-          -Cinstrument-coverage -Ccodegen-units=1 -Clink-dead-code
-          -Coverflow-checks=off
-        RUSTDOCFLAGS: >
-          -Cinstrument-coverage -Ccodegen-units=1 -Clink-dead-code
-          -Coverflow-checks=off
-      run: cargo test
-    - name: Get coverage data for codecov
-      run: |
-        grcov . --binary-path ./target/debug/ -s . -t lcov --branch \
-              --ignore-not-existing --ignore "/*" --ignore "../*" -o lcov.info
-    - name: Codecov upload
-      uses: codecov/codecov-action@v4
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: lcov.info
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.log
+          fail_ci_if_error: true
