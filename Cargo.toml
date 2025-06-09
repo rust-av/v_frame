@@ -1,6 +1,6 @@
 [package]
 name = "v_frame"
-version = "0.3.8"
+version = "0.3.9"
 rust-version = "1.80.0"
 description = "Video Frame data structures, originally part of rav1e"
 license = "BSD-2-Clause"
