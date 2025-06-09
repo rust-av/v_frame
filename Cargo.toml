@@ -1,7 +1,7 @@
 [package]
 name = "v_frame"
 version = "0.3.8"
-rust-version = "1.63.0"
+rust-version = "1.80.0"
 description = "Video Frame data structures, originally part of rav1e"
 license = "BSD-2-Clause"
 authors = ["Luca Barbato <lu_zero@gentoo.org>"]
@@ -46,10 +46,10 @@ harness = false
 
 # The rayon feature does not work on any wasm32 target
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-criterion = "0.5"
+criterion = "0.6"
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-criterion = { version = "0.5", default-features = false }
+criterion = { version = "0.6", default-features = false }
 
 # wasm-bindgen is only needed for wasm32-unknown-unknown and not other wasm32 targets
 [target.wasm32-unknown-unknown.dependencies]
