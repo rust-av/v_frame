@@ -65,3 +65,19 @@ impl<T: Pixel> Frame<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_1280x720_420_subsampling_no_padding() {
+        let frame = Frame::<u8>::new_with_padding(1280, 720, ChromaSampling::Cs420, 0);
+        assert_eq!(1280, frame.planes[0].cfg.width);
+        assert_eq!(720, frame.planes[0].cfg.height);
+        assert_eq!(640, frame.planes[1].cfg.width);
+        assert_eq!(360, frame.planes[1].cfg.height);
+        assert_eq!(640, frame.planes[2].cfg.width);
+        assert_eq!(360, frame.planes[2].cfg.height);
+    }
+}
