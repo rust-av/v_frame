@@ -65,3 +65,74 @@ impl<T: Pixel> Frame<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type TestPixel = u8;
+
+    fn get_plane_resolution(plane: &Plane<TestPixel>) -> (usize, usize) {
+        (plane.cfg.width, plane.cfg.height)
+    }
+
+    fn test_frame_resolutions(
+        resolution: (usize, usize),
+        chroma_sampling: ChromaSampling,
+        expected_luma_res: (usize, usize),
+        expected_chroma_res: (usize, usize),
+        luma_padding: usize,
+    ) {
+        let (width, height) = resolution;
+        let frame =
+            Frame::<TestPixel>::new_with_padding(width, height, chroma_sampling, luma_padding);
+
+        assert_eq!(expected_luma_res, get_plane_resolution(&frame.planes[0]));
+        assert_eq!(expected_chroma_res, get_plane_resolution(&frame.planes[1]));
+        assert_eq!(expected_chroma_res, get_plane_resolution(&frame.planes[2]));
+    }
+
+    #[test]
+    fn test_1280x720_420_subsampling_no_padding() {
+        test_frame_resolutions(
+            (1280, 720),
+            ChromaSampling::Cs420,
+            (1280, 720),
+            (640, 360),
+            0,
+        );
+    }
+
+    #[test]
+    fn test_1920x1080_420_subsampling_no_padding() {
+        test_frame_resolutions(
+            (1920, 1080),
+            ChromaSampling::Cs420,
+            (1920, 1080),
+            (960, 540),
+            0,
+        );
+    }
+
+    #[test]
+    fn test_1280x720_444_subsampling_no_padding() {
+        test_frame_resolutions(
+            (1280, 720),
+            ChromaSampling::Cs444,
+            (1280, 720),
+            (1280, 720),
+            0,
+        );
+    }
+
+    #[test]
+    fn test_1280x720_444_subsampling_2_padding() {
+        test_frame_resolutions(
+            (1280, 720),
+            ChromaSampling::Cs444,
+            (1280, 720),
+            (1280, 720),
+            2,
+        );
+    }
+}
