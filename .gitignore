@@ -1,2 +1,6 @@
 /target
 /Cargo.lock
+/.vscode
+lcov.info
+CLAUDE.md
+.claude

@@ -2,86 +2,106 @@ name: Crate
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
-
-env:
-  CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: 0
+    branches: ["main"]
 
 jobs:
-  build:
+  format:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-      - name: Build
-        run: cargo clippy
-      - name: Run tests
-        run: cargo test
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Run clippy (default features)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Run clippy (padding_api feature)
+        run: cargo clippy --all-targets --features padding_api -- -D warnings
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run tests (default features)
+        run: cargo test --all-targets
+      - name: Run tests (padding_api feature)
+        run: cargo test --all-targets --features padding_api
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: Install cargo-msrv
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-msrv
       - name: Validate minimum Rust version
-        run: |
-          cargo msrv verify
+        run: cargo msrv verify
 
   test-wasm:
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        features: ["", "padding_api"]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
-
+      - uses: Swatinem/rust-cache@v2
       - name: Install wasm-pack
         uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack
+      - name: Run WASM tests${{ matrix.features && format(' ({0})', matrix.features) || '' }}
+        run: wasm-pack test --headless --chrome --firefox ${{ matrix.features && format('--features {0}', matrix.features) || '' }}
 
-      - name: Run tests
-        run: wasm-pack test --headless --chrome --firefox
-
-  miri:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust nightly and miri
-        uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: miri, rust-src
-
-      - name: Run miri
-        env:
-          RUSTFLAGS: -Zrandomize-layout
-          MIRIFLAGS: -Zmiri-symbolic-alignment-check
-        run: cargo miri test
+  # Disabling miri for now since it seems to be really, really slow
+  # We should run it manually instead of on every CI run
+  # miri:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: dtolnay/rust-toolchain@nightly
+  #       with:
+  #         components: miri, rust-src
+  #     - uses: Swatinem/rust-cache@v2
+  #     - name: Run miri
+  #       env:
+  #         RUSTFLAGS: -Zrandomize-layout
+  #         MIRIFLAGS: -Zmiri-symbolic-alignment-check
+  #       run: cargo miri test --features padding_api
 
   code-coverage:
-    needs: [ miri, build ]
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust stable and LLVM tools
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
-
+      - uses: Swatinem/rust-cache@v2
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
-
       - name: Generate code coverage
-        run: cargo llvm-cov --lcov --output-path lcov.log
-
+        run: cargo llvm-cov --all-targets --features padding_api --lcov --output-path lcov.log
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:

@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, The rav1e contributors. All rights reserved
+// Copyright (c) 2018-2025, The rav1e contributors. All rights reserved
 //
 // This source code is subject to the terms of the BSD 2 Clause License and
 // the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
@@ -7,132 +7,310 @@
 // Media Patent License 1.0 was not distributed with this source code in the
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
-use crate::math::*;
-use crate::pixel::*;
-use crate::plane::*;
-
-#[cfg(feature = "serialize")]
-use serde::{Deserialize, Serialize};
-
-/// Represents a raw video frame
-#[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-pub struct Frame<T: Pixel> {
-    /// Planes constituting the frame.
-    pub planes: [Plane<T>; 3],
-}
-
-impl<T: Pixel> Frame<T> {
-    /// Creates a new frame with the given parameters.
-    ///
-    /// Allocates data for the planes.
-    pub fn new_with_padding(
-        width: usize,
-        height: usize,
-        chroma_sampling: ChromaSampling,
-        luma_padding: usize,
-    ) -> Self {
-        let luma_width = width.align_power_of_two(3);
-        let luma_height = height.align_power_of_two(3);
-
-        let (chroma_decimation_x, chroma_decimation_y) =
-            chroma_sampling.get_decimation().unwrap_or((0, 0));
-        let (chroma_width, chroma_height) =
-            chroma_sampling.get_chroma_dimensions(luma_width, luma_height);
-        let chroma_padding_x = luma_padding >> chroma_decimation_x;
-        let chroma_padding_y = luma_padding >> chroma_decimation_y;
-
-        Frame {
-            planes: [
-                Plane::new(luma_width, luma_height, 0, 0, luma_padding, luma_padding),
-                Plane::new(
-                    chroma_width,
-                    chroma_height,
-                    chroma_decimation_x,
-                    chroma_decimation_y,
-                    chroma_padding_x,
-                    chroma_padding_y,
-                ),
-                Plane::new(
-                    chroma_width,
-                    chroma_height,
-                    chroma_decimation_x,
-                    chroma_decimation_y,
-                    chroma_padding_x,
-                    chroma_padding_y,
-                ),
-            ],
-        }
-    }
-}
+//! YUV video frame structures and builders.
+//!
+//! This module provides the [`Frame`] type, which represents a complete YUV video frame
+//! consisting of one luma (Y) plane and optionally two chroma (U and V) planes. Frames
+//! are constructed using the [`FrameBuilder`] pattern to ensure type safety and correct
+//! configuration.
+//!
+//! # Frame Structure
+//!
+//! A YUV frame contains:
+//! - **Y plane**: Luma (brightness) information, always present
+//! - **U plane**: First chroma component (Cb), present unless monochrome
+//! - **V plane**: Second chroma component (Cr), present unless monochrome
+//!
+//! The relative dimensions of the chroma planes are determined by the
+//! [`ChromaSubsampling`](crate::chroma::ChromaSubsampling) format.
+//!
+//! # Type Safety
+//!
+//! Frames are generic over the pixel type `T: Pixel`:
+//! - Use `Frame<u8>` for 8-bit video
+//! - Use `Frame<u16>` for high bit-depth (9-16 bit) video
+//!
+//! The builder validates that the pixel type matches the specified bit depth,
+//! returning [`Error::DataTypeMismatch`](crate::error::Error::DataTypeMismatch) if they
+//! don't align.
+//!
+//! # Padding
+//!
+//! Frames support optional padding around the luma plane, which is automatically
+//! propagated to the chroma planes according to the subsampling ratio. Padding is
+//! useful for video codec algorithms that need to access pixels beyond the visible
+//! frame boundaries.
+//!
+//! # Example
+//!
+//! ```rust
+//! use v_frame::frame::FrameBuilder;
+//! use v_frame::chroma::ChromaSubsampling;
+//! use std::num::{NonZeroU8, NonZeroUsize};
+//!
+//! // Create a 1920x1080 YUV420 8-bit frame
+//! let width = NonZeroUsize::new(1920).unwrap();
+//! let height = NonZeroUsize::new(1080).unwrap();
+//! let bit_depth = NonZeroU8::new(8).unwrap();
+//!
+//! let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+//!     .build::<u8>()
+//!     .unwrap();
+//!
+//! // Access the planes
+//! assert_eq!(frame.y_plane.width().get(), 1920);
+//! assert_eq!(frame.y_plane.height().get(), 1080);
+//!
+//! // Chroma planes are half size for YUV420
+//! let u_plane = frame.u_plane.as_ref().unwrap();
+//! assert_eq!(u_plane.width().get(), 960);
+//! assert_eq!(u_plane.height().get(), 540);
+//! ```
+//!
+//! # Creating Frames with Padding
+//!
+//! ```rust
+//! use v_frame::frame::FrameBuilder;
+//! use v_frame::chroma::ChromaSubsampling;
+//! use std::num::{NonZeroU8, NonZeroUsize};
+//!
+//! let width = NonZeroUsize::new(1920).unwrap();
+//! let height = NonZeroUsize::new(1080).unwrap();
+//! let bit_depth = NonZeroU8::new(10).unwrap();
+//!
+//! let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+//! .luma_padding_left(16)
+//! .luma_padding_right(16)
+//! .luma_padding_top(16)
+//! .luma_padding_bottom(16)
+//! .build::<u16>().unwrap();
+//! ```
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod tests;
 
-    type TestPixel = u8;
+use std::num::{NonZeroU8, NonZeroUsize};
 
-    fn get_plane_resolution(plane: &Plane<TestPixel>) -> (usize, usize) {
-        (plane.cfg.width, plane.cfg.height)
+use crate::{
+    chroma::ChromaSubsampling,
+    error::Error,
+    pixel::Pixel,
+    plane::{Plane, PlaneGeometry},
+};
+
+/// Contains the data representing one YUV video frame.
+#[derive(Clone)]
+pub struct Frame<T: Pixel> {
+    /// The luma plane for this frame
+    pub y_plane: Plane<T>,
+    /// The first chroma plane for this frame, or `None` if this is a grayscale frame
+    pub u_plane: Option<Plane<T>>,
+    /// The second chroma plane for this frame, or `None` if this is a grayscale frame
+    pub v_plane: Option<Plane<T>>,
+    /// The chroma subsampling for this frame
+    pub subsampling: ChromaSubsampling,
+    /// The number of bits per pixel in this frame
+    pub bit_depth: NonZeroU8,
+}
+
+/// A builder for constructing [`Frame`] instances with validation.
+///
+/// `FrameBuilder` uses the builder pattern to construct frames safely, validating
+/// that all parameters are compatible (bit depth matches pixel type, dimensions are
+/// compatible with chroma subsampling, padding is properly aligned, etc.).
+///
+/// # Required Parameters
+///
+/// The following parameters must be provided when creating a new builder:
+/// - `width`: Frame width in pixels
+/// - `height`: Frame height in pixels
+/// - `subsampling`: Chroma subsampling format
+/// - `bit_depth`: Bit depth (8 for `u8` pixels, 9-16 for `u16` pixels)
+///
+/// # Optional Parameters
+///
+/// Luma padding can be set via setter methods. When padding is set, it is automatically
+/// propagated to the chroma planes according to the subsampling ratio.
+///
+/// # Example
+///
+/// ```rust
+/// use v_frame::frame::FrameBuilder;
+/// use v_frame::chroma::ChromaSubsampling;
+/// use std::num::{NonZeroU8, NonZeroUsize};
+///
+/// let frame = FrameBuilder::new(
+///     NonZeroUsize::new(1920).unwrap(),
+///     NonZeroUsize::new(1080).unwrap(),
+///     ChromaSubsampling::Yuv420,
+///     NonZeroU8::new(8).unwrap(),
+/// )
+/// .luma_padding_left(8)
+/// .luma_padding_right(8)
+/// .build::<u8>().unwrap();
+/// ```
+pub struct FrameBuilder {
+    /// Visible width in pixels.
+    width: NonZeroUsize,
+    /// Visible height in pixels.
+    height: NonZeroUsize,
+    /// Chroma subsampling format.
+    subsampling: ChromaSubsampling,
+    /// Bit depth of the frame's pixels (8-16).
+    bit_depth: NonZeroU8,
+    /// Number of padding pixels on the left of the luma plane.
+    luma_padding_left: usize,
+    /// Number of padding pixels on the right of the luma plane.
+    luma_padding_right: usize,
+    /// Number of padding pixels on the top of the luma plane.
+    luma_padding_top: usize,
+    /// Number of padding pixels on the bottom of the luma plane.
+    luma_padding_bottom: usize,
+}
+
+impl FrameBuilder {
+    /// Creates a new frame builder, taking the parameters that are required for all frames.
+    /// The builder then allows for setting additional, optional parameters.
+    #[inline]
+    #[must_use]
+    pub fn new(
+        width: NonZeroUsize,
+        height: NonZeroUsize,
+        subsampling: ChromaSubsampling,
+        bit_depth: NonZeroU8,
+    ) -> Self {
+        Self {
+            width,
+            height,
+            subsampling,
+            bit_depth,
+            luma_padding_left: 0,
+            luma_padding_right: 0,
+            luma_padding_top: 0,
+            luma_padding_bottom: 0,
+        }
     }
 
-    fn test_frame_resolutions(
-        resolution: (usize, usize),
-        chroma_sampling: ChromaSampling,
-        expected_luma_res: (usize, usize),
-        expected_chroma_res: (usize, usize),
-        luma_padding: usize,
-    ) {
-        let (width, height) = resolution;
-        let frame =
-            Frame::<TestPixel>::new_with_padding(width, height, chroma_sampling, luma_padding);
-
-        assert_eq!(expected_luma_res, get_plane_resolution(&frame.planes[0]));
-        assert_eq!(expected_chroma_res, get_plane_resolution(&frame.planes[1]));
-        assert_eq!(expected_chroma_res, get_plane_resolution(&frame.planes[2]));
+    /// Set the `luma_padding_left` for the frame builder.
+    #[inline]
+    #[must_use]
+    pub fn luma_padding_left(mut self, luma_padding_left: usize) -> Self {
+        self.luma_padding_left = luma_padding_left;
+        self
     }
 
-    #[test]
-    fn test_1280x720_420_subsampling_no_padding() {
-        test_frame_resolutions(
-            (1280, 720),
-            ChromaSampling::Cs420,
-            (1280, 720),
-            (640, 360),
-            0,
+    /// Set the `luma_padding_right` for the frame builder.
+    #[inline]
+    #[must_use]
+    pub fn luma_padding_right(mut self, luma_padding_right: usize) -> Self {
+        self.luma_padding_right = luma_padding_right;
+        self
+    }
+
+    /// Set the `luma_padding_top` for the frame builder.
+    #[inline]
+    #[must_use]
+    pub fn luma_padding_top(mut self, luma_padding_top: usize) -> Self {
+        self.luma_padding_top = luma_padding_top;
+        self
+    }
+
+    /// Set the `luma_padding_bottom` for the frame builder.
+    #[inline]
+    #[must_use]
+    pub fn luma_padding_bottom(mut self, luma_padding_bottom: usize) -> Self {
+        self.luma_padding_bottom = luma_padding_bottom;
+        self
+    }
+
+    /// Constructs a `Frame` from the current builder.
+    ///
+    /// # Errors
+    /// - Returns `Error::UnsupportedBitDepth` if the input bit depth is unsupported
+    ///   (currently 8-16 bit inputs are supported)
+    /// - Returns `Error::DataTypeMismatch` if the size of `T` does not match the input bit depth
+    /// - Returns `Error::UnsupportedResolution` if the resolution or padding dimensions
+    ///   do not support the requested subsampling
+    #[inline]
+    pub fn build<T: Pixel>(self) -> Result<Frame<T>, Error> {
+        if self.bit_depth.get() < 8 || self.bit_depth.get() > 16 {
+            return Err(Error::UnsupportedBitDepth {
+                found: self.bit_depth.get(),
+            });
+        }
+
+        let byte_width = size_of::<T>();
+        assert!(
+            byte_width <= 2,
+            "unsupported pixel byte width: {byte_width}"
         );
-    }
+        if (byte_width == 1 && self.bit_depth.get() != 8)
+            || (byte_width == 2 && self.bit_depth.get() <= 8)
+        {
+            return Err(Error::DataTypeMismatch);
+        }
 
-    #[test]
-    fn test_1920x1080_420_subsampling_no_padding() {
-        test_frame_resolutions(
-            (1920, 1080),
-            ChromaSampling::Cs420,
-            (1920, 1080),
-            (960, 540),
-            0,
-        );
-    }
+        let luma_stride = self
+            .width
+            .saturating_add(self.luma_padding_left)
+            .saturating_add(self.luma_padding_right);
+        let luma_geometry = PlaneGeometry {
+            width: self.width,
+            height: self.height,
+            stride: luma_stride,
+            pad_left: self.luma_padding_left,
+            pad_right: self.luma_padding_right,
+            pad_top: self.luma_padding_top,
+            pad_bottom: self.luma_padding_bottom,
+        };
+        if !self.subsampling.has_chroma() {
+            return Ok(Frame {
+                y_plane: Plane::new(luma_geometry),
+                u_plane: None,
+                v_plane: None,
+                subsampling: self.subsampling,
+                bit_depth: self.bit_depth,
+            });
+        }
 
-    #[test]
-    fn test_1280x720_444_subsampling_no_padding() {
-        test_frame_resolutions(
-            (1280, 720),
-            ChromaSampling::Cs444,
-            (1280, 720),
-            (1280, 720),
-            0,
-        );
-    }
+        let Some((chroma_width, chroma_height)) = self
+            .subsampling
+            .chroma_dimensions(self.width.get(), self.height.get())
+        else {
+            return Err(Error::UnsupportedResolution);
+        };
 
-    #[test]
-    fn test_1280x720_444_subsampling_2_padding() {
-        test_frame_resolutions(
-            (1280, 720),
-            ChromaSampling::Cs444,
-            (1280, 720),
-            (1280, 720),
-            2,
-        );
+        let (ss_x, ss_y) = self.subsampling.subsample_ratio().expect("not monochrome");
+        if self.luma_padding_left % ss_x.get() as usize > 0
+            || self.luma_padding_right % ss_x.get() as usize > 0
+            || self.luma_padding_top % ss_y.get() as usize > 0
+            || self.luma_padding_bottom % ss_y.get() as usize > 0
+        {
+            return Err(Error::UnsupportedResolution);
+        }
+        let chroma_padding_left = self.luma_padding_left / ss_x.get() as usize;
+        let chroma_padding_right = self.luma_padding_right / ss_x.get() as usize;
+        let chroma_padding_top = self.luma_padding_top / ss_y.get() as usize;
+        let chroma_padding_bottom = self.luma_padding_bottom / ss_y.get() as usize;
+        let chroma_stride = chroma_width
+            .saturating_add(chroma_padding_left)
+            .saturating_add(chroma_padding_right);
+
+        let chroma_geometry = PlaneGeometry {
+            width: NonZeroUsize::new(chroma_width).expect("cannot be zero"),
+            height: NonZeroUsize::new(chroma_height).expect("cannot be zero"),
+            stride: NonZeroUsize::new(chroma_stride).expect("cannot be zero"),
+            pad_left: chroma_padding_left,
+            pad_right: chroma_padding_right,
+            pad_top: chroma_padding_top,
+            pad_bottom: chroma_padding_bottom,
+        };
+        Ok(Frame {
+            y_plane: Plane::new(luma_geometry),
+            u_plane: Some(Plane::new(chroma_geometry)),
+            v_plane: Some(Plane::new(chroma_geometry)),
+            subsampling: self.subsampling,
+            bit_depth: self.bit_depth,
+        })
     }
 }
