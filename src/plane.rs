@@ -258,33 +258,7 @@ where
     ///   this plane's `width * height * bytes_per_pixel`
     #[inline]
     pub fn copy_from_u8_slice(&mut self, src: &[u8]) -> Result<(), Error> {
-        let byte_width = size_of::<T>();
-        assert!(
-            byte_width <= 2,
-            "unsupported pixel byte width: {byte_width}"
-        );
-
-        if byte_width == 1 {
-            // SAFETY: we know that `T` is `u8`
-            return self.copy_from_slice(unsafe { &*(src as *const [u8] as *const [T]) });
-        }
-
-        let byte_count = self.width().get() * self.height().get() * byte_width;
-        if byte_count != src.len() {
-            return Err(Error::DataLength {
-                expected: byte_count,
-                found: src.len(),
-            });
-        }
-
-        for (dest, src) in self.pixels_mut().zip(src.chunks_exact(2)) {
-            // SAFETY: we know that each chunk has 2 bytes
-            let src = unsafe { [*src.get_unchecked(0), *src.get_unchecked(1)] };
-            // SAFETY: we know that `T` is `u16`
-            let dest = unsafe { &mut *(dest as *mut T as *mut u16) };
-            *dest = u16::from_le_bytes(src);
-        }
-        Ok(())
+        self.copy_from_u8_slice_with_stride(src, self.width())
     }
 
     /// Copies the data from `src` into this plane's visible pixels.
@@ -312,11 +286,6 @@ where
                 stride: input_stride.get(),
                 width: self.width().get(),
             });
-        }
-
-        if input_stride == self.width() {
-            // The equal stride function is likely faster
-            return self.copy_from_u8_slice(src);
         }
 
         let byte_count = input_stride.get() * self.height().get() * byte_width;
