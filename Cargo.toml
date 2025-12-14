@@ -13,6 +13,9 @@ aligned-vec = "0.6.4"
 num-traits = "0.2.19"
 thiserror = "2.0.17"
 
+[dev-dependencies]
+criterion = "0.6"
+
 [features]
 padding_api = []
 
@@ -39,6 +42,10 @@ wasm-bindgen = "0.2"
 
 [target.wasm32-unknown-unknown.dev-dependencies]
 wasm-bindgen-test = "0.3"
+
+[[bench]]
+name = "plane"
+harness = false
 
 [lints.rust]
 missing_docs = "warn"
