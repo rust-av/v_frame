@@ -72,14 +72,14 @@ const DATA_ALIGNMENT: usize = 1 << 6;
 /// - [`pixel()`](Plane::pixel) / [`pixel_mut()`](Plane::pixel_mut): Access individual pixels
 /// - [`pixels()`](Plane::pixels) / [`pixels_mut()`](Plane::pixels_mut): Iterate over all visible pixels
 #[derive(Clone)]
-pub struct Plane<T: Pixel, const BIT_DEPTH: u8> {
+pub struct Plane<T: Pixel> {
     /// The underlying pixel data buffer, including padding.
     pub(crate) data: ABox<[T], ConstAlign<DATA_ALIGNMENT>>,
     /// Geometry information describing dimensions and padding.
     pub(crate) geometry: PlaneGeometry,
 }
 
-impl<T, const BIT_DEPTH: u8> Plane<T, BIT_DEPTH>
+impl<T> Plane<T>
 where
     T: Pixel,
 {
