@@ -13,11 +13,12 @@ aligned-vec = "0.6.4"
 num-traits = "0.2.19"
 thiserror = "2.0.17"
 
-[dev-dependencies]
-criterion = "0.6"
-
 [features]
 padding_api = []
+
+# Non-WASM targets use criterion with all default features (including rayon)
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+criterion = "0.6"
 
 #
 # WebAssembly/wasm32 target support below
