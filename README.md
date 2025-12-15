@@ -34,16 +34,15 @@ use v_frame::{
     frame::FrameBuilder,
     chroma::ChromaSubsampling,
 };
-use std::num::{NonZeroU8, NonZeroUsize};
+use std::num::NonZeroUsize;
 
 // Create a 1920x1080 YUV 4:2:0 frame with 8-bit pixels
 let frame = FrameBuilder::new(
     NonZeroUsize::new(1920).unwrap(),
     NonZeroUsize::new(1080).unwrap(),
     ChromaSubsampling::Yuv420,
-    NonZeroU8::new(8).unwrap(),
 )
-.build::<u8>()
+.build::<u8, 8>()
 .unwrap();
 
 // Access the Y plane (luma)
@@ -73,7 +72,8 @@ A `Frame` contains:
 - `u_plane`: First chroma plane (None for grayscale)
 - `v_plane`: Second chroma plane (None for grayscale)
 - `subsampling`: Chroma subsampling mode
-- `bit_depth`: Bits per pixel (8-16)
+
+The bit depth is specified as a const generic parameter on the `Frame` type.
 
 ### Chroma Subsampling
 
@@ -89,16 +89,15 @@ v_frame supports standard YUV formats:
 
 ```rust
 use v_frame::{frame::FrameBuilder, chroma::ChromaSubsampling};
-use std::num::{NonZeroU8, NonZeroUsize};
+use std::num::NonZeroUsize;
 
 // 10-bit 4K UHD frame
 let frame = FrameBuilder::new(
     NonZeroUsize::new(3840).unwrap(),
     NonZeroUsize::new(2160).unwrap(),
     ChromaSubsampling::Yuv420,
-    NonZeroU8::new(10).unwrap(),
 )
-.build::<u16>()
+.build::<u16, 10>()
 .unwrap();
 ```
 
@@ -106,37 +105,32 @@ let frame = FrameBuilder::new(
 
 ```rust
 use v_frame::{frame::FrameBuilder, chroma::ChromaSubsampling};
-use std::num::{NonZeroU8, NonZeroUsize};
+use std::num::NonZeroUsize;
 
-let mut builder = FrameBuilder::new(
+let frame = FrameBuilder::new(
     NonZeroUsize::new(1920).unwrap(),
     NonZeroUsize::new(1080).unwrap(),
     ChromaSubsampling::Yuv420,
-    NonZeroU8::new(8).unwrap(),
-);
-
-// Add 16 pixels of padding on all sides for block-based algorithms
-builder.luma_padding_left(16);
-builder.luma_padding_right(16);
-builder.luma_padding_top(16);
-builder.luma_padding_bottom(16);
-
-let frame = builder.build::<u8>().unwrap();
+)
+.luma_padding_left(16)
+.luma_padding_right(16)
+.luma_padding_top(16)
+.luma_padding_bottom(16)
+.build::<u8, 8>().unwrap();
 ```
 
 ### Working with Plane Data
 
 ```rust
 use v_frame::{frame::FrameBuilder, chroma::ChromaSubsampling};
-use std::num::{NonZeroU8, NonZeroUsize};
+use std::num::NonZeroUsize;
 
 let mut frame = FrameBuilder::new(
     NonZeroUsize::new(640).unwrap(),
     NonZeroUsize::new(480).unwrap(),
     ChromaSubsampling::Yuv420,
-    NonZeroU8::new(8).unwrap(),
 )
-.build::<u8>()
+.build::<u8, 8>()
 .unwrap();
 
 // Access a specific row
@@ -157,15 +151,14 @@ for pixel_row in frame.y_plane.rows() {
 
 ```rust
 use v_frame::{frame::FrameBuilder, chroma::ChromaSubsampling};
-use std::num::{NonZeroU8, NonZeroUsize};
+use std::num::NonZeroUsize;
 
 let frame = FrameBuilder::new(
     NonZeroUsize::new(1280).unwrap(),
     NonZeroUsize::new(720).unwrap(),
     ChromaSubsampling::Monochrome,
-    NonZeroU8::new(8).unwrap(),
 )
-.build::<u8>()
+.build::<u8, 8>()
 .unwrap();
 
 // u_plane and v_plane are None for monochrome

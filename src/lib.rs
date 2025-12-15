@@ -26,15 +26,14 @@
 //! ```rust
 //! use v_frame::frame::FrameBuilder;
 //! use v_frame::chroma::ChromaSubsampling;
-//! use std::num::{NonZeroU8, NonZeroUsize};
+//! use std::num::NonZeroUsize;
 //!
 //! // Create a 1920x1080 YUV420 8-bit frame
 //! let width = NonZeroUsize::new(1920).unwrap();
 //! let height = NonZeroUsize::new(1080).unwrap();
-//! let bit_depth = NonZeroU8::new(8).unwrap();
 //!
-//! let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
-//!     .build::<u8>()
+//! let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420)
+//!     .build::<u8, 8>()
 //!     .unwrap();
 //! ```
 

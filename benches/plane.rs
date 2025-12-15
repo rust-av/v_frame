@@ -5,7 +5,7 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::hint::black_box;
-use std::num::{NonZeroU8, NonZeroUsize};
+use std::num::NonZeroUsize;
 use v_frame::{chroma::ChromaSubsampling, frame::FrameBuilder, plane::Plane};
 
 /// Standard HD resolution for benchmarks (1920x1080)
@@ -13,26 +13,24 @@ const WIDTH: usize = 1920;
 const HEIGHT: usize = 1080;
 
 /// Creates a test plane for 8-bit benchmarks
-fn create_plane_u8() -> Plane<u8> {
+fn create_plane_u8() -> Plane<u8, 8> {
     let width = NonZeroUsize::new(WIDTH).unwrap();
     let height = NonZeroUsize::new(HEIGHT).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
 
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
-        .build::<u8>()
+    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420)
+        .build::<u8, 8>()
         .unwrap();
 
     frame.y_plane
 }
 
 /// Creates a test plane for 10-bit benchmarks (using u16)
-fn create_plane_u16() -> Plane<u16> {
+fn create_plane_u16() -> Plane<u16, 10> {
     let width = NonZeroUsize::new(WIDTH).unwrap();
     let height = NonZeroUsize::new(HEIGHT).unwrap();
-    let bit_depth = NonZeroU8::new(10).unwrap();
 
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
-        .build::<u16>()
+    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420)
+        .build::<u16, 10>()
         .unwrap();
 
     frame.y_plane

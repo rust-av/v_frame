@@ -53,7 +53,7 @@ fn padded_geometry(
 #[test]
 fn plane_new_u8() {
     let geometry = simple_geometry(4, 4);
-    let plane: Plane<u8> = Plane::new(geometry);
+    let plane: Plane<u8, 8> = Plane::new(geometry);
 
     assert_eq!(plane.width().get(), 4);
     assert_eq!(plane.height().get(), 4);
@@ -67,7 +67,7 @@ fn plane_new_u8() {
 #[test]
 fn plane_new_u16() {
     let geometry = simple_geometry(8, 8);
-    let plane: Plane<u16> = Plane::new(geometry);
+    let plane: Plane<u16, 10> = Plane::new(geometry);
 
     assert_eq!(plane.width().get(), 8);
     assert_eq!(plane.height().get(), 8);
@@ -81,7 +81,7 @@ fn plane_new_u16() {
 #[test]
 fn plane_dimensions() {
     let geometry = simple_geometry(16, 9);
-    let plane: Plane<u8> = Plane::new(geometry);
+    let plane: Plane<u8, 8> = Plane::new(geometry);
 
     assert_eq!(plane.width().get(), 16);
     assert_eq!(plane.height().get(), 9);
@@ -90,7 +90,7 @@ fn plane_dimensions() {
 #[test]
 fn row_access() {
     let geometry = simple_geometry(4, 3);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Modify the second row
     if let Some(row) = plane.row_mut(1) {
@@ -111,7 +111,7 @@ fn row_access() {
 #[test]
 fn row_out_of_bounds() {
     let geometry = simple_geometry(4, 3);
-    let plane: Plane<u8> = Plane::new(geometry);
+    let plane: Plane<u8, 8> = Plane::new(geometry);
 
     assert!(plane.row(3).is_none());
     assert!(plane.row(100).is_none());
@@ -120,7 +120,7 @@ fn row_out_of_bounds() {
 #[test]
 fn rows_iterator() {
     let geometry = simple_geometry(3, 4);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Fill each row with its index
     for (y, row) in plane.rows_mut().enumerate() {
@@ -140,7 +140,7 @@ fn rows_iterator() {
 #[test]
 fn pixel_access() {
     let geometry = simple_geometry(4, 4);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Set some pixels
     *plane.pixel_mut(0, 0).unwrap() = 10;
@@ -157,7 +157,7 @@ fn pixel_access() {
 #[test]
 fn pixel_out_of_bounds() {
     let geometry = simple_geometry(4, 4);
-    let plane: Plane<u8> = Plane::new(geometry);
+    let plane: Plane<u8, 8> = Plane::new(geometry);
 
     // pixel() checks against data buffer bounds, not just visible area
     // With 4x4 plane (stride=4, height=4), valid indices are 0-15
@@ -177,7 +177,7 @@ fn pixel_out_of_bounds() {
 #[test]
 fn pixels_iterator() {
     let geometry = simple_geometry(2, 3);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Fill with sequential values
     for (i, pixel) in plane.pixels_mut().enumerate() {
@@ -193,7 +193,7 @@ fn pixels_iterator() {
 #[test]
 fn byte_data_u8() {
     let geometry = simple_geometry(2, 2);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Fill with test data
     for (i, pixel) in plane.pixels_mut().enumerate() {
@@ -207,7 +207,7 @@ fn byte_data_u8() {
 #[test]
 fn byte_data_u16() {
     let geometry = simple_geometry(2, 2);
-    let mut plane: Plane<u16> = Plane::new(geometry);
+    let mut plane: Plane<u16, 10> = Plane::new(geometry);
 
     // Fill with test data (values larger than u8 range)
     *plane.pixel_mut(0, 0).unwrap() = 0x0102;
@@ -223,7 +223,7 @@ fn byte_data_u16() {
 #[test]
 fn copy_from_slice_u8() {
     let geometry = simple_geometry(3, 2);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     let data = vec![1, 2, 3, 4, 5, 6];
     plane.copy_from_slice(&data).unwrap();
@@ -235,7 +235,7 @@ fn copy_from_slice_u8() {
 #[test]
 fn copy_from_slice_u16() {
     let geometry = simple_geometry(2, 2);
-    let mut plane: Plane<u16> = Plane::new(geometry);
+    let mut plane: Plane<u16, 10> = Plane::new(geometry);
 
     let data = vec![100, 200, 300, 400];
     plane.copy_from_slice(&data).unwrap();
@@ -247,7 +247,7 @@ fn copy_from_slice_u16() {
 #[test]
 fn copy_from_slice_wrong_length() {
     let geometry = simple_geometry(3, 2);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Too short
     let data = vec![1, 2, 3];
@@ -263,7 +263,7 @@ fn copy_from_slice_wrong_length() {
 #[test]
 fn copy_from_u8_slice_u8() {
     let geometry = simple_geometry(3, 2);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     let data = vec![10, 20, 30, 40, 50, 60];
     plane.copy_from_u8_slice(&data).unwrap();
@@ -275,7 +275,7 @@ fn copy_from_u8_slice_u8() {
 #[test]
 fn copy_from_u8_slice_u16() {
     let geometry = simple_geometry(2, 2);
-    let mut plane: Plane<u16> = Plane::new(geometry);
+    let mut plane: Plane<u16, 10> = Plane::new(geometry);
 
     // Little endian u16 values: 0x0102, 0x0304, 0x0506, 0x0708
     let data = vec![0x02, 0x01, 0x04, 0x03, 0x06, 0x05, 0x08, 0x07];
@@ -290,7 +290,7 @@ fn copy_from_u8_slice_u16() {
 #[test]
 fn copy_from_u8_slice_wrong_length() {
     let geometry = simple_geometry(2, 2);
-    let mut plane: Plane<u16> = Plane::new(geometry);
+    let mut plane: Plane<u16, 10> = Plane::new(geometry);
 
     // Should need 8 bytes (4 pixels * 2 bytes each)
     let data = vec![1, 2, 3, 4]; // Only 4 bytes
@@ -301,7 +301,7 @@ fn copy_from_u8_slice_wrong_length() {
 #[test]
 fn plane_with_padding() {
     let geometry = padded_geometry(4, 3, 2, 2, 1, 1);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Width and height should reflect visible area
     assert_eq!(plane.width().get(), 4);
@@ -326,7 +326,7 @@ fn plane_with_padding() {
 #[test]
 fn plane_clone() {
     let geometry = simple_geometry(3, 3);
-    let mut plane1: Plane<u8> = Plane::new(geometry);
+    let mut plane1: Plane<u8, 8> = Plane::new(geometry);
 
     // Fill with test data
     for (i, pixel) in plane1.pixels_mut().enumerate() {
@@ -352,7 +352,7 @@ fn plane_clone() {
 #[test]
 fn data_origin_no_padding() {
     let geometry = simple_geometry(4, 4);
-    let plane: Plane<u8> = Plane::new(geometry);
+    let plane: Plane<u8, 8> = Plane::new(geometry);
 
     assert_eq!(plane.data_origin(), 0);
 }
@@ -360,7 +360,7 @@ fn data_origin_no_padding() {
 #[test]
 fn data_origin_with_padding() {
     let geometry = padded_geometry(4, 3, 2, 2, 1, 1);
-    let plane: Plane<u8> = Plane::new(geometry);
+    let plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Origin should be: stride * pad_top + pad_left = 8 * 1 + 2 = 10
     assert_eq!(plane.data_origin(), 10);
@@ -370,7 +370,7 @@ fn data_origin_with_padding() {
 #[test]
 fn padding_api_geometry() {
     let geometry = padded_geometry(4, 3, 1, 2, 1, 2);
-    let plane: Plane<u8> = Plane::new(geometry);
+    let plane: Plane<u8, 8> = Plane::new(geometry);
 
     let retrieved = plane.geometry();
     assert_eq!(retrieved, geometry);
@@ -380,7 +380,7 @@ fn padding_api_geometry() {
 #[test]
 fn padding_api_data_access() {
     let geometry = padded_geometry(2, 2, 1, 1, 1, 1);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Total data size should be stride * (height + pad_top + pad_bottom)
     // stride = 4, total_height = 4, so 16 pixels
@@ -401,7 +401,7 @@ fn padding_api_data_access() {
 #[test]
 fn copy_from_u8_slice_with_stride_u8() {
     let geometry = simple_geometry(3, 2);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Input has stride of 5, but plane width is 3
     // Row 0: [10, 20, 30, PAD, PAD]
@@ -426,7 +426,7 @@ fn copy_from_u8_slice_with_stride_u8() {
 #[test]
 fn copy_from_u8_slice_with_stride_u16() {
     let geometry = simple_geometry(2, 2);
-    let mut plane: Plane<u16> = Plane::new(geometry);
+    let mut plane: Plane<u16, 10> = Plane::new(geometry);
 
     // Input has stride of 3 pixels (6 bytes per row), but plane width is 2
     // Row 0: [0x0102, 0x0304, PAD]
@@ -450,7 +450,7 @@ fn copy_from_u8_slice_with_stride_u16() {
 #[test]
 fn copy_from_u8_slice_with_stride_equal_width() {
     let geometry = simple_geometry(3, 2);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // When stride == width, should delegate to copy_from_u8_slice
     let data = vec![1, 2, 3, 4, 5, 6];
@@ -465,7 +465,7 @@ fn copy_from_u8_slice_with_stride_equal_width() {
 #[test]
 fn copy_from_u8_slice_with_stride_invalid_stride() {
     let geometry = simple_geometry(5, 2);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Stride smaller than width is invalid
     let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
@@ -478,7 +478,7 @@ fn copy_from_u8_slice_with_stride_invalid_stride() {
 #[test]
 fn copy_from_u8_slice_with_stride_wrong_length() {
     let geometry = simple_geometry(2, 2);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Should need stride * height = 3 * 2 = 6 bytes
     let data = vec![1, 2, 3, 4]; // Only 4 bytes
@@ -489,7 +489,7 @@ fn copy_from_u8_slice_with_stride_wrong_length() {
 
     // u16 case: should need stride * height * 2 bytes
     let geometry = simple_geometry(2, 2);
-    let mut plane: Plane<u16> = Plane::new(geometry);
+    let mut plane: Plane<u16, 10> = Plane::new(geometry);
 
     // Should need 3 * 2 * 2 = 12 bytes
     let data = vec![1, 2, 3, 4, 5, 6]; // Only 6 bytes
@@ -502,7 +502,7 @@ fn copy_from_u8_slice_with_stride_wrong_length() {
 #[test]
 fn large_plane() {
     let geometry = simple_geometry(1920, 1080);
-    let plane: Plane<u8> = Plane::new(geometry);
+    let plane: Plane<u8, 8> = Plane::new(geometry);
 
     assert_eq!(plane.width().get(), 1920);
     assert_eq!(plane.height().get(), 1080);
@@ -512,7 +512,7 @@ fn large_plane() {
 #[test]
 fn row_mutation_isolation() {
     let geometry = simple_geometry(4, 4);
-    let mut plane: Plane<u8> = Plane::new(geometry);
+    let mut plane: Plane<u8, 8> = Plane::new(geometry);
 
     // Modify row 1
     if let Some(row) = plane.row_mut(1) {
@@ -531,7 +531,7 @@ fn row_mutation_isolation() {
 #[test]
 fn rows_count() {
     let geometry = simple_geometry(10, 5);
-    let plane: Plane<u8> = Plane::new(geometry);
+    let plane: Plane<u8, 8> = Plane::new(geometry);
 
     let row_count = plane.rows().count();
     assert_eq!(row_count, 5);
@@ -540,7 +540,7 @@ fn rows_count() {
 #[test]
 fn pixels_count() {
     let geometry = simple_geometry(7, 11);
-    let plane: Plane<u8> = Plane::new(geometry);
+    let plane: Plane<u8, 8> = Plane::new(geometry);
 
     let pixel_count = plane.pixels().count();
     assert_eq!(pixel_count, 7 * 11);

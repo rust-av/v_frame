@@ -26,9 +26,9 @@
 //!
 //! # Type Safety
 //!
-//! Frames are generic over the pixel type `T: Pixel`:
-//! - Use `Frame<u8>` for 8-bit video
-//! - Use `Frame<u16>` for high bit-depth (9-16 bit) video
+//! Frames are generic over the pixel type `T: Pixel` and bit depth `BIT_DEPTH`:
+//! - Use `Frame<u8, 8>` for 8-bit video
+//! - Use `Frame<u16, BIT_DEPTH>` for high bit-depth (9-16 bit) video
 //!
 //! The builder validates that the pixel type matches the specified bit depth,
 //! returning [`Error::DataTypeMismatch`](crate::error::Error::DataTypeMismatch) if they
@@ -46,15 +46,14 @@
 //! ```rust
 //! use v_frame::frame::FrameBuilder;
 //! use v_frame::chroma::ChromaSubsampling;
-//! use std::num::{NonZeroU8, NonZeroUsize};
+//! use std::num::NonZeroUsize;
 //!
 //! // Create a 1920x1080 YUV420 8-bit frame
 //! let width = NonZeroUsize::new(1920).unwrap();
 //! let height = NonZeroUsize::new(1080).unwrap();
-//! let bit_depth = NonZeroU8::new(8).unwrap();
 //!
-//! let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
-//!     .build::<u8>()
+//! let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420)
+//!     .build::<u8, 8>()
 //!     .unwrap();
 //!
 //! // Access the planes
@@ -72,24 +71,23 @@
 //! ```rust
 //! use v_frame::frame::FrameBuilder;
 //! use v_frame::chroma::ChromaSubsampling;
-//! use std::num::{NonZeroU8, NonZeroUsize};
+//! use std::num::NonZeroUsize;
 //!
 //! let width = NonZeroUsize::new(1920).unwrap();
 //! let height = NonZeroUsize::new(1080).unwrap();
-//! let bit_depth = NonZeroU8::new(10).unwrap();
 //!
-//! let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+//! let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420)
 //! .luma_padding_left(16)
 //! .luma_padding_right(16)
 //! .luma_padding_top(16)
 //! .luma_padding_bottom(16)
-//! .build::<u16>().unwrap();
+//! .build::<u16, 10>().unwrap();
 //! ```
 
 #[cfg(test)]
 mod tests;
 
-use std::num::{NonZeroU8, NonZeroUsize};
+use std::num::NonZeroUsize;
 
 use crate::{
     chroma::ChromaSubsampling,
@@ -100,17 +98,15 @@ use crate::{
 
 /// Contains the data representing one YUV video frame.
 #[derive(Clone)]
-pub struct Frame<T: Pixel> {
+pub struct Frame<T: Pixel, const BIT_DEPTH: u8> {
     /// The luma plane for this frame
-    pub y_plane: Plane<T>,
+    pub y_plane: Plane<T, BIT_DEPTH>,
     /// The first chroma plane for this frame, or `None` if this is a grayscale frame
-    pub u_plane: Option<Plane<T>>,
+    pub u_plane: Option<Plane<T, BIT_DEPTH>>,
     /// The second chroma plane for this frame, or `None` if this is a grayscale frame
-    pub v_plane: Option<Plane<T>>,
+    pub v_plane: Option<Plane<T, BIT_DEPTH>>,
     /// The chroma subsampling for this frame
     pub subsampling: ChromaSubsampling,
-    /// The number of bits per pixel in this frame
-    pub bit_depth: NonZeroU8,
 }
 
 /// A builder for constructing [`Frame`] instances with validation.
@@ -125,7 +121,8 @@ pub struct Frame<T: Pixel> {
 /// - `width`: Frame width in pixels
 /// - `height`: Frame height in pixels
 /// - `subsampling`: Chroma subsampling format
-/// - `bit_depth`: Bit depth (8 for `u8` pixels, 9-16 for `u16` pixels)
+///
+/// The bit depth is specified as a const generic parameter when calling `build()`.
 ///
 /// # Optional Parameters
 ///
@@ -137,17 +134,16 @@ pub struct Frame<T: Pixel> {
 /// ```rust
 /// use v_frame::frame::FrameBuilder;
 /// use v_frame::chroma::ChromaSubsampling;
-/// use std::num::{NonZeroU8, NonZeroUsize};
+/// use std::num::NonZeroUsize;
 ///
 /// let frame = FrameBuilder::new(
 ///     NonZeroUsize::new(1920).unwrap(),
 ///     NonZeroUsize::new(1080).unwrap(),
 ///     ChromaSubsampling::Yuv420,
-///     NonZeroU8::new(8).unwrap(),
 /// )
 /// .luma_padding_left(8)
 /// .luma_padding_right(8)
-/// .build::<u8>().unwrap();
+/// .build::<u8, 8>().unwrap();
 /// ```
 pub struct FrameBuilder {
     /// Visible width in pixels.
@@ -156,8 +152,6 @@ pub struct FrameBuilder {
     height: NonZeroUsize,
     /// Chroma subsampling format.
     subsampling: ChromaSubsampling,
-    /// Bit depth of the frame's pixels (8-16).
-    bit_depth: NonZeroU8,
     /// Number of padding pixels on the left of the luma plane.
     luma_padding_left: usize,
     /// Number of padding pixels on the right of the luma plane.
@@ -173,17 +167,11 @@ impl FrameBuilder {
     /// The builder then allows for setting additional, optional parameters.
     #[inline]
     #[must_use]
-    pub fn new(
-        width: NonZeroUsize,
-        height: NonZeroUsize,
-        subsampling: ChromaSubsampling,
-        bit_depth: NonZeroU8,
-    ) -> Self {
+    pub fn new(width: NonZeroUsize, height: NonZeroUsize, subsampling: ChromaSubsampling) -> Self {
         Self {
             width,
             height,
             subsampling,
-            bit_depth,
             luma_padding_left: 0,
             luma_padding_right: 0,
             luma_padding_top: 0,
@@ -232,11 +220,9 @@ impl FrameBuilder {
     /// - Returns `Error::UnsupportedResolution` if the resolution or padding dimensions
     ///   do not support the requested subsampling
     #[inline]
-    pub fn build<T: Pixel>(self) -> Result<Frame<T>, Error> {
-        if self.bit_depth.get() < 8 || self.bit_depth.get() > 16 {
-            return Err(Error::UnsupportedBitDepth {
-                found: self.bit_depth.get(),
-            });
+    pub fn build<T: Pixel, const BIT_DEPTH: u8>(self) -> Result<Frame<T, BIT_DEPTH>, Error> {
+        if BIT_DEPTH < 8 || BIT_DEPTH > 16 {
+            return Err(Error::UnsupportedBitDepth { found: BIT_DEPTH });
         }
 
         let byte_width = size_of::<T>();
@@ -244,9 +230,7 @@ impl FrameBuilder {
             byte_width <= 2,
             "unsupported pixel byte width: {byte_width}"
         );
-        if (byte_width == 1 && self.bit_depth.get() != 8)
-            || (byte_width == 2 && self.bit_depth.get() <= 8)
-        {
+        if (byte_width == 1 && BIT_DEPTH != 8) || (byte_width == 2 && BIT_DEPTH <= 8) {
             return Err(Error::DataTypeMismatch);
         }
 
@@ -269,7 +253,6 @@ impl FrameBuilder {
                 u_plane: None,
                 v_plane: None,
                 subsampling: self.subsampling,
-                bit_depth: self.bit_depth,
             });
         }
 
@@ -310,7 +293,6 @@ impl FrameBuilder {
             u_plane: Some(Plane::new(chroma_geometry)),
             v_plane: Some(Plane::new(chroma_geometry)),
             subsampling: self.subsampling,
-            bit_depth: self.bit_depth,
         })
     }
 }
