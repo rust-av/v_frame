@@ -24,6 +24,8 @@ fn simple_geometry(width: usize, height: usize) -> PlaneGeometry {
         pad_right: 0,
         pad_top: 0,
         pad_bottom: 0,
+        subsampling_x: NonZeroU8::new(1).unwrap(),
+        subsampling_y: NonZeroU8::new(1).unwrap(),
     }
 }
 
@@ -47,6 +49,8 @@ fn padded_geometry(
         pad_right,
         pad_top,
         pad_bottom,
+        subsampling_x: NonZeroU8::new(1).unwrap(),
+        subsampling_y: NonZeroU8::new(1).unwrap(),
     }
 }
 

@@ -33,7 +33,10 @@
 #[cfg(test)]
 mod tests;
 
-use std::{iter, num::NonZeroUsize};
+use std::{
+    iter,
+    num::{NonZeroU8, NonZeroUsize},
+};
 
 use aligned_vec::{ABox, AVec, ConstAlign};
 
@@ -395,4 +398,22 @@ pub struct PlaneGeometry {
     pub pad_top: usize,
     /// Number of padding pixels on the bottom.
     pub pad_bottom: usize,
+    /// The horizontal subsampling ratio of this plane compared to the luma plane
+    /// Will be 1 if no subsampling
+    pub subsampling_x: NonZeroU8,
+    /// The horizontal subsampling ratio of this plane compared to the luma plane
+    /// Will be 1 if no subsampling
+    pub subsampling_y: NonZeroU8,
+}
+
+impl PlaneGeometry {
+    /// Returns the total height of the plane, including padding
+    #[inline]
+    #[must_use]
+    #[cfg_attr(not(feature = "padding_api"), doc(hidden))]
+    pub fn alloc_height(&self) -> NonZeroUsize {
+        self.height
+            .saturating_add(self.pad_top)
+            .saturating_add(self.pad_bottom)
+    }
 }

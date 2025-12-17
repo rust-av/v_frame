@@ -262,6 +262,8 @@ impl FrameBuilder {
             pad_right: self.luma_padding_right,
             pad_top: self.luma_padding_top,
             pad_bottom: self.luma_padding_bottom,
+            subsampling_x: NonZeroU8::new(1).expect("non-zero constant"),
+            subsampling_y: NonZeroU8::new(1).expect("non-zero constant"),
         };
         if !self.subsampling.has_chroma() {
             return Ok(Frame {
@@ -304,6 +306,8 @@ impl FrameBuilder {
             pad_right: chroma_padding_right,
             pad_top: chroma_padding_top,
             pad_bottom: chroma_padding_bottom,
+            subsampling_x: ss_x,
+            subsampling_y: ss_y,
         };
         Ok(Frame {
             y_plane: Plane::new(luma_geometry),
