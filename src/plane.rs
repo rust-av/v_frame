@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2021, The rav1e contributors. All rights reserved
+// Copyright (c) 2017-2025, The rav1e contributors. All rights reserved
 //
 // This source code is subject to the terms of the BSD 2 Clause License and
 // the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
@@ -7,1237 +7,413 @@
 // Media Patent License 1.0 was not distributed with this source code in the
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
-use std::fmt::{Debug, Display, Formatter};
-use std::iter::{self, FusedIterator};
-use std::marker::PhantomData;
-use std::mem::size_of;
-use std::ops::{Index, IndexMut, Range};
+//! Plane data structure for storing two-dimensional pixel data.
+//!
+//! This module provides the [`Plane`] type, which represents a single plane of pixel data
+//! with optional padding. Planes are the building blocks of video frames, with a YUV frame
+//! typically consisting of one luma (Y) plane and two chroma (U and V) planes.
+//!
+//! # Memory Layout
+//!
+//! Planes store data in a contiguous, aligned buffer with support for padding on all sides:
+//! - Data is aligned to 64 bytes on non-WASM platforms (SIMD-friendly)
+//! - Data is aligned to 8 bytes on WASM platforms
+//! - Padding pixels surround the visible area for codec algorithms that need border access
+//!
+//! # API Design
+//!
+//! The public API exposes only the "visible" pixels by default, abstracting away the padding.
+//! Methods like [`rows()`](Plane::rows), [`pixels()`](Plane::pixels), and indexing operations
+//! work only with the visible area. Low-level padding access is available via the
+//! `padding_api` feature flag.
+//!
+//! To ensure safety, planes must be instantiated by building a [`Frame`](crate::frame::Frame)
+//! through the [`FrameBuilder`](crate::frame::FrameBuilder) interface.
+
+#[cfg(test)]
+mod tests;
+
+use std::{
+    iter,
+    num::{NonZeroU8, NonZeroUsize},
+};
 
 use aligned_vec::{ABox, AVec, ConstAlign};
 
-use crate::math::*;
-use crate::pixel::*;
+use crate::{error::Error, pixel::Pixel};
 
-#[cfg(feature = "serialize")]
-use serde::{Deserialize, Serialize};
+/// Alignment for plane data on WASM platforms (8 bytes).
+#[cfg(target_arch = "wasm32")]
+const DATA_ALIGNMENT: usize = 1 << 3;
 
-/// Plane-specific configuration.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-pub struct PlaneConfig {
-    /// Data stride.
-    pub stride: usize,
-    /// Allocated height in pixels.
-    pub alloc_height: usize,
-    /// Width in pixels.
-    pub width: usize,
-    /// Height in pixels.
-    pub height: usize,
-    /// Decimator along the X axis.
-    ///
-    /// For example, for chroma planes in a 4:2:0 configuration this would be 1.
-    pub xdec: usize,
-    /// Decimator along the Y axis.
-    ///
-    /// For example, for chroma planes in a 4:2:0 configuration this would be 1.
-    pub ydec: usize,
-    /// Number of padding pixels on the right.
-    pub xpad: usize,
-    /// Number of padding pixels on the bottom.
-    pub ypad: usize,
-    /// X where the data starts.
-    pub xorigin: usize,
-    /// Y where the data starts.
-    pub yorigin: usize,
-}
+/// Alignment for plane data on non-WASM platforms (64 bytes for SIMD optimization).
+#[cfg(not(target_arch = "wasm32"))]
+const DATA_ALIGNMENT: usize = 1 << 6;
 
-impl PlaneConfig {
-    /// Stride alignment in bytes.
-    const STRIDE_ALIGNMENT_LOG2: usize = 6;
-
-    #[inline]
-    pub fn new(
-        width: usize,
-        height: usize,
-        xdec: usize,
-        ydec: usize,
-        xpad: usize,
-        ypad: usize,
-        type_size: usize,
-    ) -> Self {
-        let xorigin = xpad.align_power_of_two(Self::STRIDE_ALIGNMENT_LOG2 + 1 - type_size);
-        let yorigin = ypad;
-        let stride = (xorigin + width + xpad)
-            .align_power_of_two(Self::STRIDE_ALIGNMENT_LOG2 + 1 - type_size);
-        let alloc_height = yorigin + height + ypad;
-
-        PlaneConfig {
-            stride,
-            alloc_height,
-            width,
-            height,
-            xdec,
-            ydec,
-            xpad,
-            ypad,
-            xorigin,
-            yorigin,
-        }
-    }
-}
-
-/// Absolute offset in pixels inside a plane
-#[derive(Clone, Copy, Debug, Default)]
-pub struct PlaneOffset {
-    pub x: isize,
-    pub y: isize,
-}
-
-/// Backing buffer for the Plane data
+/// A two-dimensional plane of pixel data with optional padding.
 ///
-/// The buffer is padded and aligned according to the architecture-specific
-/// SIMD constraints.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-pub struct PlaneData<T: Pixel> {
-    #[cfg(not(target_arch = "wasm32"))]
-    data: ABox<[T], ConstAlign<{ 1 << 6 }>>,
-    #[cfg(target_arch = "wasm32")]
-    data: ABox<[T], ConstAlign<{ 1 << 3 }>>,
+/// `Plane<T>` represents a rectangular array of pixels of type `T`, where `T` implements
+/// the [`Pixel`] trait (currently `u8` or `u16`). The plane supports arbitrary padding
+/// on all four sides, which is useful for video codec algorithms that need to access
+/// pixels beyond the visible frame boundaries.
+///
+/// # Memory Layout
+///
+/// The data is stored in a contiguous, aligned buffer:
+/// - 64-byte alignment on non-WASM platforms (optimized for SIMD operations)
+/// - 8-byte alignment on WASM platforms
+///
+/// The visible pixels are surrounded by optional padding pixels. The public API
+/// provides access only to the visible area by default; padding access requires
+/// the `padding_api` feature flag.
+///
+/// # Accessing Pixels
+///
+/// Planes provide several ways to access pixel data:
+/// - [`row()`](Plane::row) / [`row_mut()`](Plane::row_mut): Access a single row by index
+/// - [`rows()`](Plane::rows) / [`rows_mut()`](Plane::rows_mut): Iterate over all visible rows
+/// - [`pixel()`](Plane::pixel) / [`pixel_mut()`](Plane::pixel_mut): Access individual pixels
+/// - [`pixels()`](Plane::pixels) / [`pixels_mut()`](Plane::pixels_mut): Iterate over all visible pixels
+#[derive(Clone)]
+pub struct Plane<T: Pixel> {
+    /// The underlying pixel data buffer, including padding.
+    pub(crate) data: ABox<[T], ConstAlign<DATA_ALIGNMENT>>,
+    /// Geometry information describing dimensions and padding.
+    pub(crate) geometry: PlaneGeometry,
 }
 
-unsafe impl<T: Pixel + Send> Send for PlaneData<T> {}
-unsafe impl<T: Pixel + Sync> Sync for PlaneData<T> {}
-
-impl<T: Pixel> std::ops::Deref for PlaneData<T> {
-    type Target = [T];
-
-    fn deref(&self) -> &[T] {
-        self.data.as_ref()
-    }
-}
-
-impl<T: Pixel> std::ops::DerefMut for PlaneData<T> {
-    fn deref_mut(&mut self) -> &mut [T] {
-        self.data.as_mut()
-    }
-}
-
-impl<T: Pixel> PlaneData<T> {
-    #[cfg(target_arch = "wasm32")]
-    // FIXME: wasm32 allocator fails for alignment larger than 3
-    const DATA_ALIGNMENT: usize = 1 << 3;
-    #[cfg(not(target_arch = "wasm32"))]
-    const DATA_ALIGNMENT: usize = 1 << 6;
-
-    pub fn new(len: usize) -> Self {
+impl<T> Plane<T>
+where
+    T: Pixel,
+{
+    /// Creates a new plane with the given geometry, initialized with zero-valued pixels.
+    pub(crate) fn new(geometry: PlaneGeometry) -> Self {
+        let rows = geometry
+            .height
+            .saturating_add(geometry.pad_top)
+            .saturating_add(geometry.pad_bottom);
         Self {
             data: AVec::from_iter(
-                Self::DATA_ALIGNMENT,
-                iter::repeat(T::cast_from(128)).take(len),
+                DATA_ALIGNMENT,
+                iter::repeat_n(T::zero(), geometry.stride.get() * rows.get()),
             )
             .into_boxed_slice(),
+            geometry,
         }
     }
 
-    fn from_slice(data: &[T]) -> Self {
-        Self {
-            data: AVec::from_slice(Self::DATA_ALIGNMENT, data).into_boxed_slice(),
-        }
-    }
-}
-
-/// One data plane of a frame.
-///
-/// For example, a plane can be a Y luma plane or a U or V chroma plane.
-#[derive(Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-pub struct Plane<T: Pixel> {
-    // TODO: it is used by encoder to copy by plane and by tiling, make it
-    // private again once tiling is moved and a copy_plane fn is added.
-    //
-    pub data: PlaneData<T>,
-    /// Plane configuration.
-    pub cfg: PlaneConfig,
-}
-
-impl<T: Pixel> Debug for Plane<T>
-where
-    T: Display,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Plane {{ data: [{}, ...], cfg: {:?} }}",
-            self.data[0], self.cfg
-        )
-    }
-}
-
-impl<T: Pixel> Plane<T> {
-    /// Allocates and returns a new plane.
-    pub fn new(
-        width: usize,
-        height: usize,
-        xdec: usize,
-        ydec: usize,
-        xpad: usize,
-        ypad: usize,
-    ) -> Self {
-        let cfg = PlaneConfig::new(width, height, xdec, ydec, xpad, ypad, size_of::<T>());
-        let data = PlaneData::new(cfg.stride * cfg.alloc_height);
-
-        Plane { data, cfg }
-    }
-
-    /// # Panics
-    ///
-    /// - If `len` is not a multiple of `stride`
-    pub fn from_slice(data: &[T], stride: usize) -> Self {
-        let len = data.len();
-
-        assert!(len % stride == 0);
-
-        Self {
-            data: PlaneData::from_slice(data),
-            cfg: PlaneConfig {
-                stride,
-                alloc_height: len / stride,
-                width: stride,
-                height: len / stride,
-                xdec: 0,
-                ydec: 0,
-                xpad: 0,
-                ypad: 0,
-                xorigin: 0,
-                yorigin: 0,
-            },
-        }
-    }
-
-    pub fn pad(&mut self, w: usize, h: usize) {
-        let xorigin = self.cfg.xorigin;
-        let yorigin = self.cfg.yorigin;
-        let stride = self.cfg.stride;
-        let alloc_height = self.cfg.alloc_height;
-        let width = (w + self.cfg.xdec) >> self.cfg.xdec;
-        let height = (h + self.cfg.ydec) >> self.cfg.ydec;
-
-        if xorigin > 0 {
-            for y in 0..height {
-                let base = (yorigin + y) * stride;
-                let fill_val = self.data[base + xorigin];
-                for val in &mut self.data[base..base + xorigin] {
-                    *val = fill_val;
-                }
-            }
-        }
-
-        if xorigin + width < stride {
-            for y in 0..height {
-                let base = (yorigin + y) * stride + xorigin + width;
-                let fill_val = self.data[base - 1];
-                for val in &mut self.data[base..base + stride - (xorigin + width)] {
-                    *val = fill_val;
-                }
-            }
-        }
-
-        if yorigin > 0 {
-            let (top, bottom) = self.data.split_at_mut(yorigin * stride);
-            let src = &bottom[..stride];
-            for y in 0..yorigin {
-                let dst = &mut top[y * stride..(y + 1) * stride];
-                dst.copy_from_slice(src);
-            }
-        }
-
-        if yorigin + height < self.cfg.alloc_height {
-            let (top, bottom) = self.data.split_at_mut((yorigin + height) * stride);
-            let src = &top[(yorigin + height - 1) * stride..];
-            for y in 0..alloc_height - (yorigin + height) {
-                let dst = &mut bottom[y * stride..(y + 1) * stride];
-                dst.copy_from_slice(src);
-            }
-        }
-    }
-
-    /// Minimally test that the plane has been padded.
-    pub fn probe_padding(&self, w: usize, h: usize) -> bool {
-        let PlaneConfig {
-            xorigin,
-            yorigin,
-            stride,
-            alloc_height,
-            xdec,
-            ydec,
-            ..
-        } = self.cfg;
-        let width = (w + xdec) >> xdec;
-        let height = (h + ydec) >> ydec;
-        let corner = (yorigin + height - 1) * stride + xorigin + width - 1;
-        let corner_value = self.data[corner];
-
-        self.data[(yorigin + height) * stride - 1] == corner_value
-            && self.data[(alloc_height - 1) * stride + xorigin + width - 1] == corner_value
-            && self.data[alloc_height * stride - 1] == corner_value
-    }
-
-    pub fn slice(&self, po: PlaneOffset) -> PlaneSlice<'_, T> {
-        PlaneSlice {
-            plane: self,
-            x: po.x,
-            y: po.y,
-        }
-    }
-
-    pub fn mut_slice(&mut self, po: PlaneOffset) -> PlaneMutSlice<'_, T> {
-        PlaneMutSlice {
-            plane: self,
-            x: po.x,
-            y: po.y,
-        }
-    }
-
+    /// Returns the visible width of the plane in pixels
     #[inline]
-    fn index(&self, x: usize, y: usize) -> usize {
-        (y + self.cfg.yorigin) * self.cfg.stride + (x + self.cfg.xorigin)
+    #[must_use]
+    pub fn width(&self) -> NonZeroUsize {
+        self.geometry.width
     }
 
-    /// This version of the function crops off the padding on the right side of the image
+    /// Returns the visible height of the plane in pixels
     #[inline]
-    pub fn row_range_cropped(&self, x: isize, y: isize) -> Range<usize> {
-        debug_assert!(self.cfg.yorigin as isize + y >= 0);
-        debug_assert!(self.cfg.xorigin as isize + x >= 0);
-        let base_y = (self.cfg.yorigin as isize + y) as usize;
-        let base_x = (self.cfg.xorigin as isize + x) as usize;
-        let base = base_y * self.cfg.stride + base_x;
-        let width = (self.cfg.width as isize - x) as usize;
-        base..base + width
+    #[must_use]
+    pub fn height(&self) -> NonZeroUsize {
+        self.geometry.height
     }
 
-    /// This version of the function includes the padding on the right side of the image
+    /// Returns a slice containing the visible pixels in
+    /// the row at vertical index `y`.
     #[inline]
-    pub fn row_range(&self, x: isize, y: isize) -> Range<usize> {
-        debug_assert!(self.cfg.yorigin as isize + y >= 0);
-        debug_assert!(self.cfg.xorigin as isize + x >= 0);
-        let base_y = (self.cfg.yorigin as isize + y) as usize;
-        let base_x = (self.cfg.xorigin as isize + x) as usize;
-        let base = base_y * self.cfg.stride + base_x;
-        let width = self.cfg.stride - base_x;
-        base..base + width
+    #[must_use]
+    pub fn row(&self, y: usize) -> Option<&[T]> {
+        self.rows().nth(y)
     }
 
-    /// Returns the pixel at the given coordinates.
-    pub fn p(&self, x: usize, y: usize) -> T {
-        self.data[self.index(x, y)]
+    /// Returns a mutable slice containing the visible pixels in
+    /// the row at vertical index `y`.
+    #[inline]
+    #[must_use]
+    pub fn row_mut(&mut self, y: usize) -> Option<&mut [T]> {
+        self.rows_mut().nth(y)
     }
 
-    /// Returns plane data starting from the origin.
-    pub fn data_origin(&self) -> &[T] {
-        &self.data[self.index(0, 0)..]
+    /// Returns an iterator over the visible pixels of each row
+    /// in the plane, from top to bottom.
+    #[inline]
+    pub fn rows(&self) -> impl Iterator<Item = &[T]> {
+        let origin = self.data_origin();
+        // SAFETY: The plane creation interface ensures the data is large enough
+        let visible_data = unsafe { self.data.get_unchecked(origin..) };
+        visible_data
+            .chunks(self.geometry.stride.get())
+            .take(self.geometry.height.get())
+            .map(|row| {
+                // SAFETY: The plane creation interface ensures the data is large enough
+                unsafe { row.get_unchecked(..self.geometry.width.get()) }
+            })
     }
 
-    /// Returns mutable plane data starting from the origin.
-    pub fn data_origin_mut(&mut self) -> &mut [T] {
-        let i = self.index(0, 0);
-        &mut self.data[i..]
+    /// Returns a mutable iterator over the visible pixels of each row
+    /// in the plane, from top to bottom.
+    #[inline]
+    pub fn rows_mut(&mut self) -> impl Iterator<Item = &mut [T]> {
+        let origin = self.data_origin();
+        // SAFETY: The plane creation interface ensures the data is large enough
+        let visible_data = unsafe { self.data.get_unchecked_mut(origin..) };
+        visible_data
+            .chunks_mut(self.geometry.stride.get())
+            .take(self.geometry.height.get())
+            .map(|row| {
+                // SAFETY: The plane creation interface ensures the data is large enough
+                unsafe { row.get_unchecked_mut(..self.geometry.width.get()) }
+            })
     }
 
-    /// Copies data into the plane from a pixel array.
+    /// Return the value of the pixel at the given `(x, y)` coordinate,
+    /// or `None` if the index is out of bounds.
     ///
-    /// # Panics
+    /// Since this performs bounds checking, it is likely less performant
+    /// and should not be used to iterate over rows and pixels.
+    #[inline]
+    #[must_use]
+    pub fn pixel(&self, x: usize, y: usize) -> Option<T> {
+        let index = self.data_origin() + self.geometry.stride.get() * y + x;
+        self.data.get(index).copied()
+    }
+
+    /// Return a mutable reference to the pixel at the given `(x, y)` coordinate,
+    /// or `None` if the index is out of bounds.
     ///
-    /// - If `source_bytewidth` does not match the generic `T` of `Plane`
-    pub fn copy_from_raw_u8(
+    /// Since this performs bounds checking, it is likely less performant
+    /// and should not be used to iterate over rows and pixels.
+    #[inline]
+    pub fn pixel_mut(&mut self, x: usize, y: usize) -> Option<&mut T> {
+        let index = self.data_origin() + self.geometry.stride.get() * y + x;
+        self.data.get_mut(index)
+    }
+
+    /// Returns an iterator over the visible pixels in the plane,
+    /// in row-major order.
+    #[inline]
+    pub fn pixels(&self) -> impl Iterator<Item = T> {
+        self.rows().flatten().copied()
+    }
+
+    /// Returns a mutable iterator over the visible pixels in the plane,
+    /// in row-major order.
+    #[inline]
+    pub fn pixels_mut(&mut self) -> impl Iterator<Item = &mut T> {
+        self.rows_mut().flatten()
+    }
+
+    /// Returns an iterator over the visible byte data in the plane,
+    /// in row-major order. High-bit-depth data is converted to `u8`
+    /// using low endianness.
+    #[inline]
+    pub fn byte_data(&self) -> impl Iterator<Item = u8> {
+        let byte_width = size_of::<T>();
+        assert!(
+            byte_width <= 2,
+            "unsupported pixel byte width: {byte_width}"
+        );
+
+        self.pixels().flat_map(move |pix| {
+            let bytes: [u8; 2] = if byte_width == 1 {
+                [
+                    pix.to_u8()
+                        .expect("Pixel::byte_data only supports u8 and u16 pixels"),
+                    0,
+                ]
+            } else {
+                pix.to_u16()
+                    .expect("Pixel::byte_data only supports u8 and u16 pixels")
+                    .to_le_bytes()
+            };
+            bytes.into_iter().take(byte_width)
+        })
+    }
+
+    /// Copies the data from `src` into this plane's visible pixels.
+    ///
+    /// # Errors
+    /// - Returns `Error::Datalength` if the length of `src` does not match
+    ///   this plane's `width * height`
+    #[inline]
+    pub fn copy_from_slice(&mut self, src: &[T]) -> Result<(), Error> {
+        let pixel_count = self.width().get() * self.height().get();
+        if pixel_count != src.len() {
+            return Err(Error::DataLength {
+                expected: pixel_count,
+                found: src.len(),
+            });
+        }
+
+        for (dest, src) in self.pixels_mut().zip(src.iter()) {
+            *dest = *src;
+        }
+        Ok(())
+    }
+
+    /// Copies the data from `src` into this plane's visible pixels.
+    /// This differs from `copy_from_slice` in that it accepts a raw slice
+    /// of `u8` data, which is often what is provided by decoders even if
+    /// the pixel data is high-bit-depth. This will convert high-bit-depth
+    /// pixels to `u16`, assuming low endian encoding. For low-bit-depth data,
+    /// this is equivalent to `copy_from_slice`.
+    ///
+    /// # Errors
+    /// - Returns `Error::Datalength` if the length of `src` does not match
+    ///   this plane's `width * height * bytes_per_pixel`
+    #[inline]
+    pub fn copy_from_u8_slice(&mut self, src: &[u8]) -> Result<(), Error> {
+        self.copy_from_u8_slice_with_stride(src, self.width())
+    }
+
+    /// Copies the data from `src` into this plane's visible pixels.
+    /// This version accepts inputs where the row stride is longer than the visible data width.
+    /// The `input_stride` must be in pixels.
+    ///
+    /// # Errors
+    /// - Returns `Error::Datalength` if the length of `src` does not match
+    ///   this plane's `width * height * bytes_per_pixel`
+    /// - Returns `Error::InvalidStride` if the stride is shorter than the visible width
+    #[inline]
+    pub fn copy_from_u8_slice_with_stride(
         &mut self,
-        source: &[u8],
-        source_stride: usize,
-        source_bytewidth: usize,
-    ) {
-        let stride = self.cfg.stride;
-
-        assert!(stride != 0);
-        assert!(source_stride != 0);
-
-        for (self_row, source_row) in self
-            .data_origin_mut()
-            .chunks_exact_mut(stride)
-            .zip(source.chunks_exact(source_stride))
-        {
-            match source_bytewidth {
-                1 => {
-                    for (self_pixel, source_pixel) in self_row.iter_mut().zip(source_row.iter()) {
-                        *self_pixel = T::cast_from(*source_pixel);
-                    }
-                }
-                2 => {
-                    assert!(
-                        size_of::<T>() == 2,
-                        "source bytewidth ({}) cannot fit in Plane<u8>",
-                        source_bytewidth
-                    );
-
-                    debug_assert!(T::type_enum() == PixelType::U16);
-
-                    // SAFETY: because of the assert it is safe to assume that T == u16
-                    let self_row: &mut [u16] = unsafe { std::mem::transmute(self_row) };
-                    // SAFETY: we reinterpret the slice of bytes as a slice of elements of
-                    // [u8; 2] to allow for more efficient codegen with from_le_bytes
-                    let source_row: &[[u8; 2]] = unsafe {
-                        std::slice::from_raw_parts(source_row.as_ptr().cast(), source_row.len() / 2)
-                    };
-
-                    for (self_pixel, bytes) in self_row.iter_mut().zip(source_row) {
-                        *self_pixel = u16::from_le_bytes(*bytes);
-                    }
-                }
-
-                _ => {}
-            }
-        }
-    }
-
-    /// Copies data from a plane into a pixel array.
-    ///
-    /// # Panics
-    ///
-    /// - If `dest_bytewidth` does not match the generic `T` of `Plane`
-    pub fn copy_to_raw_u8(&self, dest: &mut [u8], dest_stride: usize, dest_bytewidth: usize) {
-        let stride = self.cfg.stride;
-        for (self_row, dest_row) in self
-            .data_origin()
-            .chunks_exact(stride)
-            .zip(dest.chunks_exact_mut(dest_stride))
-        {
-            match dest_bytewidth {
-                1 => {
-                    for (self_pixel, dest_pixel) in
-                        self_row[..self.cfg.width].iter().zip(dest_row.iter_mut())
-                    {
-                        *dest_pixel = u8::cast_from(*self_pixel);
-                    }
-                }
-                2 => {
-                    assert!(
-                        size_of::<T>() >= 2,
-                        "dest bytewidth ({}) cannot fit in Plane<u8>",
-                        dest_bytewidth
-                    );
-
-                    // SAFETY: we reinterpret the slice of bytes as a slice
-                    // of [u8; 2] with half the elements
-                    let dest_row: &mut [[u8; 2]] = unsafe {
-                        std::slice::from_raw_parts_mut(
-                            dest_row.as_mut_ptr().cast(),
-                            dest_row.len() / 2,
-                        )
-                    };
-
-                    for (self_pixel, bytes) in self_row[..self.cfg.width].iter().zip(dest_row) {
-                        *bytes = u16::cast_from(*self_pixel).to_le_bytes();
-                    }
-                }
-
-                _ => {}
-            }
-        }
-    }
-
-    /// Returns plane with half the resolution for width and height.
-    /// Downscaled with 2x2 box filter.
-    /// Padded to dimensions with `frame_width` and `frame_height`.
-    ///
-    /// # Panics
-    ///
-    /// - If the requested width and height are > half the input width or height
-    pub fn downsampled(&self, frame_width: usize, frame_height: usize) -> Plane<T> {
-        let src = self;
-        let mut new = Plane::new(
-            (src.cfg.width + 1) / 2,
-            (src.cfg.height + 1) / 2,
-            src.cfg.xdec + 1,
-            src.cfg.ydec + 1,
-            src.cfg.xpad / 2,
-            src.cfg.ypad / 2,
+        src: &[u8],
+        input_stride: NonZeroUsize,
+    ) -> Result<(), Error> {
+        let byte_width = size_of::<T>();
+        assert!(
+            byte_width <= 2,
+            "unsupported pixel byte width: {byte_width}"
         );
 
-        let width = new.cfg.width;
-        let height = new.cfg.height;
+        if input_stride < self.width() {
+            return Err(Error::InvalidStride {
+                stride: input_stride.get(),
+                width: self.width().get(),
+            });
+        }
 
-        assert!(width * 2 <= src.cfg.stride - src.cfg.xorigin);
-        assert!(height * 2 <= src.cfg.alloc_height - src.cfg.yorigin);
+        let byte_count = input_stride.get() * self.height().get() * byte_width;
+        if byte_count != src.len() {
+            return Err(Error::DataLength {
+                expected: byte_count,
+                found: src.len(),
+            });
+        }
 
-        let data_origin = src.data_origin();
-        for (row_idx, dst_row) in new
-            .mut_slice(PlaneOffset::default())
-            .rows_iter_mut()
-            .enumerate()
-            .take(height)
-        {
-            let src_top_row = &data_origin[(src.cfg.stride * row_idx * 2)..][..(2 * width)];
-            let src_bottom_row =
-                &data_origin[(src.cfg.stride * (row_idx * 2 + 1))..][..(2 * width)];
+        let width = self.width().get();
+        let stride = input_stride.get();
 
-            for ((dst, a), b) in dst_row
-                .iter_mut()
-                .zip(src_top_row.chunks_exact(2))
-                .zip(src_bottom_row.chunks_exact(2))
-            {
-                let sum = u32::cast_from(a[0])
-                    + u32::cast_from(a[1])
-                    + u32::cast_from(b[0])
-                    + u32::cast_from(b[1]);
-                let avg = (sum + 2) >> 2;
-                *dst = T::cast_from(avg);
+        if byte_width == 1 {
+            // Fast path for u8 pixels
+            for (row_idx, dest_row) in self.rows_mut().enumerate() {
+                let src_offset = row_idx * stride;
+                let src_row = &src[src_offset..src_offset + width];
+                // SAFETY: we know that `T` is `u8`
+                let src_row_typed = unsafe { &*(src_row as *const [u8] as *const [T]) };
+                dest_row.copy_from_slice(src_row_typed);
             }
-        }
+        } else {
+            // u16 pixels - need to convert from little-endian bytes
+            let row_byte_width = width * byte_width;
+            for (row_idx, dest_row) in self.rows_mut().enumerate() {
+                let src_offset = row_idx * stride * byte_width;
+                let src_row = &src[src_offset..src_offset + row_byte_width];
 
-        new.pad(frame_width, frame_height);
-        new
-    }
-
-    /// Returns a plane downscaled from the source plane by a factor of `scale` (not padded)
-    pub fn downscale<const SCALE: usize>(&self) -> Plane<T> {
-        let mut new_plane = Plane::new(self.cfg.width / SCALE, self.cfg.height / SCALE, 0, 0, 0, 0);
-
-        self.downscale_in_place::<SCALE>(&mut new_plane);
-
-        new_plane
-    }
-
-    /// Downscales the source plane by a factor of `scale`, writing the result to `in_plane` (not padded)
-    ///
-    /// # Panics
-    ///
-    /// - If the current plane's width and height are not at least `SCALE` times the `in_plane`'s
-    #[cfg_attr(feature = "profiling", profiling::function(downscale_in_place))]
-    pub fn downscale_in_place<const SCALE: usize>(&self, in_plane: &mut Plane<T>) {
-        let stride = in_plane.cfg.stride;
-        let width = in_plane.cfg.width;
-        let height = in_plane.cfg.height;
-
-        if stride == 0 || self.cfg.stride == 0 {
-            panic!("stride cannot be 0");
-        }
-
-        assert!(width * SCALE <= self.cfg.stride - self.cfg.xorigin);
-        assert!(height * SCALE <= self.cfg.alloc_height - self.cfg.yorigin);
-
-        // SAFETY: Bounds checks have been removed for performance reasons
-        unsafe {
-            let src = self;
-            let box_pixels = SCALE * SCALE;
-            let half_box_pixels = box_pixels as u32 / 2; // Used for rounding int division
-
-            let data_origin = src.data_origin();
-            let plane_data_mut_slice = &mut *in_plane.data;
-
-            // Iter dst rows
-            for row_idx in 0..height {
-                let dst_row = plane_data_mut_slice.get_unchecked_mut(row_idx * stride..);
-                // Iter dst cols
-                for (col_idx, dst) in dst_row.get_unchecked_mut(..width).iter_mut().enumerate() {
-                    macro_rules! generate_inner_loop {
-                        ($x:ty) => {
-                            let mut sum = half_box_pixels as $x;
-                            // Sum box of size scale * scale
-
-                            // Iter src row
-                            for y in 0..SCALE {
-                                let src_row_idx = row_idx * SCALE + y;
-                                let src_row =
-                                    data_origin.get_unchecked((src_row_idx * src.cfg.stride)..);
-
-                                // Iter src col
-                                for x in 0..SCALE {
-                                    let src_col_idx = col_idx * SCALE + x;
-                                    sum += <$x>::cast_from(*src_row.get_unchecked(src_col_idx));
-                                }
-                            }
-
-                            // Box average
-                            let avg = sum as usize / box_pixels;
-                            *dst = T::cast_from(avg);
-                        };
-                    }
-
-                    // Use 16 bit precision if overflow would not happen
-                    if T::type_enum() == PixelType::U8
-                        && SCALE as u128 * SCALE as u128 * (u8::MAX as u128)
-                            + half_box_pixels as u128
-                            <= u16::MAX as u128
-                    {
-                        generate_inner_loop!(u16);
-                    } else {
-                        generate_inner_loop!(u32);
-                    }
+                for (dest_pixel, src_chunk) in dest_row.iter_mut().zip(src_row.chunks_exact(2)) {
+                    // SAFETY: we know that each chunk has 2 bytes
+                    let bytes =
+                        unsafe { [*src_chunk.get_unchecked(0), *src_chunk.get_unchecked(1)] };
+                    // SAFETY: we know that `T` is `u16`
+                    let dest = unsafe { &mut *(dest_pixel as *mut T as *mut u16) };
+                    *dest = u16::from_le_bytes(bytes);
                 }
             }
         }
+
+        Ok(())
     }
 
-    /// Iterates over the pixels in the plane, skipping the padding.
-    pub fn iter(&self) -> PlaneIter<'_, T> {
-        PlaneIter::new(self)
+    /// Returns the geometry of the current plane.
+    ///
+    /// This is a low-level API intended only for functions that require access to the padding.
+    #[inline]
+    #[must_use]
+    #[cfg(feature = "padding_api")]
+    pub fn geometry(&self) -> PlaneGeometry {
+        self.geometry
     }
 
-    /// Iterates over the lines of the plane
-    pub fn rows_iter(&self) -> RowsIter<'_, T> {
-        RowsIter {
-            plane: self,
-            x: 0,
-            y: 0,
-        }
+    /// Returns a reference to the current plane's data, including padding.
+    ///
+    /// This is a low-level API intended only for functions that require access to the padding.
+    #[inline]
+    #[must_use]
+    #[cfg(feature = "padding_api")]
+    pub fn data(&self) -> &[T] {
+        &self.data
     }
 
-    pub fn rows_iter_mut(&mut self) -> RowsIterMut<'_, T> {
-        RowsIterMut {
-            plane: self as *mut Plane<T>,
-            x: 0,
-            y: 0,
-            phantom: PhantomData,
-        }
+    /// Returns a mutable reference to the current plane's data, including padding.
+    ///
+    /// This is a low-level API intended only for functions that require access to the padding.
+    #[inline]
+    #[must_use]
+    #[cfg(feature = "padding_api")]
+    pub fn data_mut(&mut self) -> &mut [T] {
+        &mut self.data
     }
 
-    /// Return a line
-    pub fn row(&self, y: isize) -> &[T] {
-        let range = self.row_range(0, y);
-
-        &self.data[range]
-    }
-}
-
-/// Iterator over plane pixels, skipping padding.
-#[derive(Debug)]
-pub struct PlaneIter<'a, T: Pixel> {
-    plane: &'a Plane<T>,
-    y: usize,
-    x: usize,
-}
-
-impl<'a, T: Pixel> PlaneIter<'a, T> {
-    /// Creates a new iterator.
-    pub fn new(plane: &'a Plane<T>) -> Self {
-        Self { plane, y: 0, x: 0 }
-    }
-
-    fn width(&self) -> usize {
-        self.plane.cfg.width
-    }
-
-    fn height(&self) -> usize {
-        self.plane.cfg.height
+    /// Returns the index for the first visible pixel in `data`.
+    ///
+    /// This is a low-level API intended only for functions that require access to the padding.
+    #[inline]
+    #[must_use]
+    #[cfg_attr(not(feature = "padding_api"), doc(hidden))]
+    pub fn data_origin(&self) -> usize {
+        self.geometry.stride.get() * self.geometry.pad_top + self.geometry.pad_left
     }
 }
 
-impl<T: Pixel> Iterator for PlaneIter<'_, T> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<<Self as Iterator>::Item> {
-        if self.y == self.height() {
-            return None;
-        }
-        let pixel = self.plane.p(self.x, self.y);
-        if self.x == self.width() - 1 {
-            self.x = 0;
-            self.y += 1;
-        } else {
-            self.x += 1;
-        }
-        Some(pixel)
-    }
+/// Describes the geometry of a plane, including dimensions and padding.
+///
+/// This struct contains all the information needed to interpret the layout of
+/// a plane's data buffer, including the visible dimensions and the padding on
+/// all four sides.
+///
+/// The `stride` represents the number of pixels per row in the data buffer,
+/// which is equal to `width + pad_left + pad_right`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(not(feature = "padding_api"), doc(hidden))]
+pub struct PlaneGeometry {
+    /// Width of the visible area in pixels.
+    pub width: NonZeroUsize,
+    /// Height of the visible area in pixels.
+    pub height: NonZeroUsize,
+    /// Data stride (pixels per row in the buffer, including padding).
+    pub stride: NonZeroUsize,
+    /// Number of padding pixels on the left side.
+    pub pad_left: usize,
+    /// Number of padding pixels on the right side.
+    pub pad_right: usize,
+    /// Number of padding pixels on the top.
+    pub pad_top: usize,
+    /// Number of padding pixels on the bottom.
+    pub pad_bottom: usize,
+    /// The horizontal subsampling ratio of this plane compared to the luma plane
+    /// Will be 1 if no subsampling
+    pub subsampling_x: NonZeroU8,
+    /// The horizontal subsampling ratio of this plane compared to the luma plane
+    /// Will be 1 if no subsampling
+    pub subsampling_y: NonZeroU8,
 }
 
-impl<T: Pixel> FusedIterator for PlaneIter<'_, T> {}
-
-// A Plane, PlaneSlice, or PlaneRegion is assumed to include or be able to include
-// padding on the edge of the frame
-#[derive(Clone, Copy, Debug)]
-pub struct PlaneSlice<'a, T: Pixel> {
-    pub plane: &'a Plane<T>,
-    pub x: isize,
-    pub y: isize,
-}
-
-// A RowsIter or RowsIterMut is assumed to crop the padding from the frame edges
-pub struct RowsIter<'a, T: Pixel> {
-    plane: &'a Plane<T>,
-    x: isize,
-    y: isize,
-}
-
-impl<'a, T: Pixel> Iterator for RowsIter<'a, T> {
-    type Item = &'a [T];
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.plane.cfg.height as isize > self.y {
-            // cannot directly return self.ps.row(row) due to lifetime issue
-            let range = self.plane.row_range_cropped(self.x, self.y);
-            self.y += 1;
-            Some(&self.plane.data[range])
-        } else {
-            None
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.plane.cfg.height as isize - self.y;
-        debug_assert!(remaining >= 0);
-        let remaining = remaining as usize;
-
-        (remaining, Some(remaining))
-    }
-}
-
-impl<T: Pixel> ExactSizeIterator for RowsIter<'_, T> {}
-impl<T: Pixel> FusedIterator for RowsIter<'_, T> {}
-
-impl<'a, T: Pixel> PlaneSlice<'a, T> {
-    #[allow(unused)]
-    pub fn as_ptr(&self) -> *const T {
-        self[0].as_ptr()
-    }
-
-    pub fn rows_iter(&self) -> RowsIter<'_, T> {
-        RowsIter {
-            plane: self.plane,
-            x: self.x,
-            y: self.y,
-        }
-    }
-
-    pub fn clamp(&self) -> PlaneSlice<'a, T> {
-        PlaneSlice {
-            plane: self.plane,
-            x: self.x.clamp(
-                -(self.plane.cfg.xorigin as isize),
-                self.plane.cfg.width as isize,
-            ),
-            y: self.y.clamp(
-                -(self.plane.cfg.yorigin as isize),
-                self.plane.cfg.height as isize,
-            ),
-        }
-    }
-
-    pub fn subslice(&self, xo: usize, yo: usize) -> PlaneSlice<'a, T> {
-        PlaneSlice {
-            plane: self.plane,
-            x: self.x + xo as isize,
-            y: self.y + yo as isize,
-        }
-    }
-
-    pub fn reslice(&self, xo: isize, yo: isize) -> PlaneSlice<'a, T> {
-        PlaneSlice {
-            plane: self.plane,
-            x: self.x + xo,
-            y: self.y + yo,
-        }
-    }
-
-    /// A slice starting i pixels above the current one.
-    pub fn go_up(&self, i: usize) -> PlaneSlice<'a, T> {
-        PlaneSlice {
-            plane: self.plane,
-            x: self.x,
-            y: self.y - i as isize,
-        }
-    }
-
-    /// A slice starting i pixels to the left of the current one.
-    pub fn go_left(&self, i: usize) -> PlaneSlice<'a, T> {
-        PlaneSlice {
-            plane: self.plane,
-            x: self.x - i as isize,
-            y: self.y,
-        }
-    }
-
-    pub fn p(&self, add_x: usize, add_y: usize) -> T {
-        let new_y = (self.y + add_y as isize + self.plane.cfg.yorigin as isize) as usize;
-        let new_x = (self.x + add_x as isize + self.plane.cfg.xorigin as isize) as usize;
-        self.plane.data[new_y * self.plane.cfg.stride + new_x]
-    }
-
-    /// Checks if `add_y` and `add_x` lies in the allocated bounds of the
-    /// underlying plane.
-    pub fn accessible(&self, add_x: usize, add_y: usize) -> bool {
-        let y = (self.y + add_y as isize + self.plane.cfg.yorigin as isize) as usize;
-        let x = (self.x + add_x as isize + self.plane.cfg.xorigin as isize) as usize;
-        y < self.plane.cfg.alloc_height && x < self.plane.cfg.stride
-    }
-
-    /// Checks if -`sub_x` and -`sub_y` lies in the allocated bounds of the
-    /// underlying plane.
-    pub fn accessible_neg(&self, sub_x: usize, sub_y: usize) -> bool {
-        let y = self.y - sub_y as isize + self.plane.cfg.yorigin as isize;
-        let x = self.x - sub_x as isize + self.plane.cfg.xorigin as isize;
-        y >= 0 && x >= 0
-    }
-
-    /// This version of the function crops off the padding on the right side of the image
-    pub fn row_cropped(&self, y: usize) -> &[T] {
-        let y = (self.y + y as isize + self.plane.cfg.yorigin as isize) as usize;
-        let x = (self.x + self.plane.cfg.xorigin as isize) as usize;
-        let start = y * self.plane.cfg.stride + x;
-        let width = (self.plane.cfg.width as isize - self.x) as usize;
-        &self.plane.data[start..start + width]
-    }
-
-    /// This version of the function includes the padding on the right side of the image
-    pub fn row(&self, y: usize) -> &[T] {
-        let y = (self.y + y as isize + self.plane.cfg.yorigin as isize) as usize;
-        let x = (self.x + self.plane.cfg.xorigin as isize) as usize;
-        let start = y * self.plane.cfg.stride + x;
-        let width = self.plane.cfg.stride - x;
-        &self.plane.data[start..start + width]
-    }
-}
-
-impl<T: Pixel> Index<usize> for PlaneSlice<'_, T> {
-    type Output = [T];
-    fn index(&self, index: usize) -> &Self::Output {
-        let range = self.plane.row_range(self.x, self.y + index as isize);
-        &self.plane.data[range]
-    }
-}
-
-pub struct PlaneMutSlice<'a, T: Pixel> {
-    pub plane: &'a mut Plane<T>,
-    pub x: isize,
-    pub y: isize,
-}
-
-pub struct RowsIterMut<'a, T: Pixel> {
-    plane: *mut Plane<T>,
-    x: isize,
-    y: isize,
-    phantom: PhantomData<&'a mut Plane<T>>,
-}
-
-impl<'a, T: Pixel> Iterator for RowsIterMut<'a, T> {
-    type Item = &'a mut [T];
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // SAFETY: there could not be a concurrent call using a mutable reference to the plane
-        let plane = unsafe { &mut *self.plane };
-        if plane.cfg.height as isize > self.y {
-            // cannot directly return self.ps.row(row) due to lifetime issue
-            let range = plane.row_range_cropped(self.x, self.y);
-            self.y += 1;
-            Some(&mut plane.data[range])
-        } else {
-            None
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        // SAFETY: there could not be a concurrent call using a mutable reference to the plane
-        let plane = unsafe { &mut *self.plane };
-        let remaining = plane.cfg.height as isize - self.y;
-        debug_assert!(remaining >= 0);
-        let remaining = remaining as usize;
-
-        (remaining, Some(remaining))
-    }
-}
-
-impl<T: Pixel> ExactSizeIterator for RowsIterMut<'_, T> {}
-impl<T: Pixel> FusedIterator for RowsIterMut<'_, T> {}
-
-impl<T: Pixel> PlaneMutSlice<'_, T> {
-    #[allow(unused)]
-    pub fn rows_iter(&self) -> RowsIter<'_, T> {
-        RowsIter {
-            plane: self.plane,
-            x: self.x,
-            y: self.y,
-        }
-    }
-
-    pub fn rows_iter_mut(&mut self) -> RowsIterMut<'_, T> {
-        RowsIterMut {
-            plane: self.plane as *mut Plane<T>,
-            x: self.x,
-            y: self.y,
-            phantom: PhantomData,
-        }
-    }
-
-    #[allow(unused)]
-    pub fn subslice(&mut self, xo: usize, yo: usize) -> PlaneMutSlice<'_, T> {
-        PlaneMutSlice {
-            plane: self.plane,
-            x: self.x + xo as isize,
-            y: self.y + yo as isize,
-        }
-    }
-}
-
-impl<T: Pixel> Index<usize> for PlaneMutSlice<'_, T> {
-    type Output = [T];
-    fn index(&self, index: usize) -> &Self::Output {
-        let range = self.plane.row_range(self.x, self.y + index as isize);
-        &self.plane.data[range]
-    }
-}
-
-impl<T: Pixel> IndexMut<usize> for PlaneMutSlice<'_, T> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        let range = self.plane.row_range(self.x, self.y + index as isize);
-        &mut self.plane.data[range]
-    }
-}
-
-#[cfg(test)]
-pub mod test {
-    use super::*;
-
-    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-    use wasm_bindgen_test::*;
-
-    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-    wasm_bindgen_test_configure!(run_in_browser);
-
-    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
-    #[test]
-    fn copy_from_raw_u8() {
-        #[rustfmt::skip]
-        let mut plane = Plane::from_slice(&[
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 1, 2, 3, 4, 0, 0,
-            0, 0, 8, 7, 6, 5, 0, 0,
-            0, 0, 9, 8, 7, 6, 0, 0,
-            0, 0, 2, 3, 4, 5, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-        ], 8);
-
-        let input = vec![42u8; 64];
-
-        plane.copy_from_raw_u8(&input, 8, 1);
-
-        println!("{:?}", &plane.data[..10]);
-
-        assert_eq!(&input[..64], &plane.data[..64]);
-    }
-
-    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
-    #[test]
-    fn copy_to_raw_u8() {
-        #[rustfmt::skip]
-        let plane = Plane::from_slice(&[
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 1, 2, 3, 4, 0, 0,
-            0, 0, 8, 7, 6, 5, 0, 0,
-            0, 0, 9, 8, 7, 6, 0, 0,
-            0, 0, 2, 3, 4, 5, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-        ], 8);
-
-        let mut output = vec![42u8; 64];
-
-        plane.copy_to_raw_u8(&mut output, 8, 1);
-
-        println!("{:?}", &plane.data[..10]);
-
-        assert_eq!(&output[..64], &plane.data[..64]);
-    }
-
-    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
-    #[test]
-    fn test_plane_downsample() {
-        #[rustfmt::skip]
-        let plane = Plane::<u8> {
-            data: PlaneData::from_slice(&[
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 1, 2, 3, 4, 0, 0,
-                0, 0, 8, 7, 6, 5, 0, 0,
-                0, 0, 9, 8, 7, 6, 0, 0,
-                0, 0, 2, 3, 4, 5, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-            ]),
-            cfg: PlaneConfig {
-                stride: 8,
-                alloc_height: 9,
-                width: 4,
-                height: 4,
-                xdec: 0,
-                ydec: 0,
-                xpad: 0,
-                ypad: 0,
-                xorigin: 2,
-                yorigin: 3,
-            },
-        };
-        let downsampled = plane.downsampled(4, 4);
-
-        #[rustfmt::skip]
-        let expected = &[
-            5, 5,
-            6, 6,
-        ];
-
-        let v: Vec<_> = downsampled.iter().collect();
-
-        assert_eq!(&expected[..], &v[..]);
-    }
-
-    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
-    #[test]
-    fn test_plane_downsample_odd() {
-        #[rustfmt::skip]
-        let plane = Plane::<u8> {
-            data: PlaneData::from_slice(&[
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 1, 2, 3, 4, 0, 0,
-                0, 0, 8, 7, 6, 5, 0, 0,
-                0, 0, 9, 8, 7, 6, 0, 0,
-                0, 0, 2, 3, 4, 5, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-            ]),
-            cfg: PlaneConfig {
-                stride: 8,
-                alloc_height: 9,
-                width: 3,
-                height: 3,
-                xdec: 0,
-                ydec: 0,
-                xpad: 0,
-                ypad: 0,
-                xorigin: 2,
-                yorigin: 3,
-            },
-        };
-        let downsampled = plane.downsampled(3, 3);
-
-        #[rustfmt::skip]
-        let expected = &[
-            5, 5,
-            6, 6,
-        ];
-
-        let v: Vec<_> = downsampled.iter().collect();
-        assert_eq!(&expected[..], &v[..]);
-    }
-
-    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
-    #[test]
-    fn test_plane_downscale() {
-        #[rustfmt::skip]
-        let plane = Plane::<u8> {
-            data: PlaneData::from_slice(&[
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1, 4, 5, 0, 0,
-                0, 0, 2, 3, 6, 7, 0, 0,
-                0, 0, 8, 9, 7, 5, 0, 0,
-                0, 0, 9, 8, 3, 1, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-            ]),
-            cfg: PlaneConfig {
-                stride: 8,
-                alloc_height: 9,
-                width: 4,
-                height: 4,
-                xdec: 0,
-                ydec: 0,
-                xpad: 0,
-                ypad: 0,
-                xorigin: 2,
-                yorigin: 3,
-            },
-        };
-        let downscaled = plane.downscale::<2>();
-
-        #[rustfmt::skip]
-        let expected = &[
-            2, 6,
-            9, 4
-        ];
-
-        let v: Vec<_> = downscaled.iter().collect();
-        assert_eq!(&expected[..], &v[..]);
-    }
-
-    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
-    #[test]
-    fn test_plane_downscale_odd() {
-        #[rustfmt::skip]
-        let plane = Plane::<u8> {
-            data: PlaneData::from_slice(&[
-                1, 2, 3, 4, 1, 2, 3, 4,
-                0, 0, 8, 7, 6, 5, 8, 7,
-                6, 5, 8, 7, 6, 5, 8, 7,
-                6, 5, 8, 7, 0, 0, 2, 3,
-                4, 5, 0, 0, 9, 8, 7, 6,
-                0, 0, 0, 0, 2, 3, 4, 5,
-                0, 0, 0, 0, 2, 3, 4, 5,
-            ]),
-            cfg: PlaneConfig {
-                stride: 8,
-                alloc_height: 7,
-                width: 8,
-                height: 7,
-                xdec: 0,
-                ydec: 0,
-                xpad: 0,
-                ypad: 0,
-                xorigin: 0,
-                yorigin: 0,
-            },
-        };
-
-        let downscaled = plane.downscale::<3>();
-
-        #[rustfmt::skip]
-        let expected = &[
-            4, 5,
-            3, 3
-        ];
-
-        let v: Vec<_> = downscaled.iter().collect();
-        assert_eq!(&expected[..], &v[..]);
-    }
-
-    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
-    #[test]
-    fn test_plane_downscale_odd_2() {
-        #[rustfmt::skip]
-        let plane = Plane::<u8> {
-            data: PlaneData::from_slice(&[
-                9, 8, 3, 1, 0, 1, 4, 5, 0, 0,
-                0, 1, 4, 5, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 9, 0,
-                0, 2, 3, 6, 7, 0, 0, 0, 0, 0,
-                0, 0, 8, 9, 7, 5, 0, 0, 0, 0,
-                9, 8, 3, 1, 0, 1, 4, 5, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 2, 3, 6, 7, 0,
-                0, 0, 0, 0, 0, 0, 8, 9, 7, 5,
-                0, 0, 0, 0, 9, 8, 3, 1, 0, 0
-            ]),
-            cfg: PlaneConfig {
-                stride: 10,
-                alloc_height: 10,
-                width: 10,
-                height: 10,
-                xdec: 0,
-                ydec: 0,
-                xpad: 0,
-                ypad: 0,
-                xorigin: 0,
-                yorigin: 0,
-            },
-        };
-        let downscaled = plane.downscale::<3>();
-
-        #[rustfmt::skip]
-        let expected = &[
-            3, 1, 2,
-            4, 4, 1,
-            0, 0, 4,
-        ];
-
-        let v: Vec<_> = downscaled.iter().collect();
-        assert_eq!(&expected[..], &v[..]);
-    }
-
-    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
-    #[test]
-    fn test_plane_pad() {
-        #[rustfmt::skip]
-        let mut plane = Plane::<u8> {
-            data: PlaneData::from_slice(&[
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 1, 2, 3, 4, 0, 0,
-                0, 0, 8, 7, 6, 5, 0, 0,
-                0, 0, 9, 8, 7, 6, 0, 0,
-                0, 0, 2, 3, 4, 5, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-            ]),
-            cfg: PlaneConfig {
-                stride: 8,
-                alloc_height: 9,
-                width: 4,
-                height: 4,
-                xdec: 0,
-                ydec: 0,
-                xpad: 0,
-                ypad: 0,
-                xorigin: 2,
-                yorigin: 3,
-            },
-        };
-        plane.pad(4, 4);
-
-        #[rustfmt::skip]
-        assert_eq!(&[
-            1, 1, 1, 2, 3, 4, 4, 4,
-            1, 1, 1, 2, 3, 4, 4, 4,
-            1, 1, 1, 2, 3, 4, 4, 4,
-            1, 1, 1, 2, 3, 4, 4, 4,
-            8, 8, 8, 7, 6, 5, 5, 5,
-            9, 9, 9, 8, 7, 6, 6, 6,
-            2, 2, 2, 3, 4, 5, 5, 5,
-            2, 2, 2, 3, 4, 5, 5, 5,
-            2, 2, 2, 3, 4, 5, 5, 5,
-        ], &plane.data[..]);
-    }
-
-    #[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), wasm_bindgen_test)]
-    #[test]
-    fn test_pixel_iterator() {
-        #[rustfmt::skip]
-        let plane = Plane::<u8> {
-            data: PlaneData::from_slice(&[
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 1, 2, 3, 4, 0, 0,
-                0, 0, 8, 7, 6, 5, 0, 0,
-                0, 0, 9, 8, 7, 6, 0, 0,
-                0, 0, 2, 3, 4, 5, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-            ]),
-            cfg: PlaneConfig {
-                stride: 8,
-                alloc_height: 9,
-                width: 4,
-                height: 4,
-                xdec: 0,
-                ydec: 0,
-                xpad: 0,
-                ypad: 0,
-                xorigin: 2,
-                yorigin: 3,
-            },
-        };
-
-        let pixels: Vec<u8> = plane.iter().collect();
-
-        assert_eq!(
-            &[1, 2, 3, 4, 8, 7, 6, 5, 9, 8, 7, 6, 2, 3, 4, 5,][..],
-            &pixels[..]
-        );
+impl PlaneGeometry {
+    /// Returns the total height of the plane, including padding
+    #[inline]
+    #[must_use]
+    #[cfg_attr(not(feature = "padding_api"), doc(hidden))]
+    pub fn alloc_height(&self) -> NonZeroUsize {
+        self.height
+            .saturating_add(self.pad_top)
+            .saturating_add(self.pad_bottom)
     }
 }
