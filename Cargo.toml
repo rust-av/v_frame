@@ -44,11 +44,17 @@ wasm-bindgen = "0.2"
 [target.wasm32-unknown-unknown.dev-dependencies]
 wasm-bindgen-test = "0.3"
 # Disable rayon feature for WASM compatibility
-criterion = { version = "0.6", default-features = false, features = ["plotters", "cargo_bench_support"] }
+criterion = { version = "0.6", default-features = false, features = [
+    "plotters",
+    "cargo_bench_support",
+] }
 
 [target.wasm32-wasi.dev-dependencies]
 # Disable rayon feature for WASM compatibility
-criterion = { version = "0.6", default-features = false, features = ["plotters", "cargo_bench_support"] }
+criterion = { version = "0.6", default-features = false, features = [
+    "plotters",
+    "cargo_bench_support",
+] }
 
 [[bench]]
 name = "plane"

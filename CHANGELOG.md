@@ -1,3 +1,11 @@
+# Changelog
+
+## Version 0.4.0
+
+- [Breaking] Rewrite the API
+  - This is a large change with significant breakage, consumers may want to refer to
+    [the pull request](https://github.com/rust-av/v_frame/pull/44) for more context
+
 ## Version 0.3.8
 
 - Eliminate unsound code
