@@ -41,7 +41,7 @@ use num_traits::PrimInt;
 ///
 /// Attempting to create a frame with a mismatched type will result in
 /// [`Error::DataTypeMismatch`](crate::error::Error::DataTypeMismatch).
-pub trait Pixel: Copy + Clone + Default + Send + Sync + PrimInt {}
+pub trait Pixel: Copy + Clone + Default + Send + Sync + PrimInt + 'static {}
 
 /// Pixel implementation for 8-bit video data.
 impl Pixel for u8 {}
