@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.4.1
+
+- Implement `ExactSizeIterator` and `DoubleEndedIterator` for plane iterators
+
 ## Version 0.4.0
 
 - [Breaking] Rewrite the API
