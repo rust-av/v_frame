@@ -135,7 +135,8 @@ where
     /// Returns an iterator over the visible pixels of each row
     /// in the plane, from top to bottom.
     #[inline]
-    pub fn rows(&self) -> impl Iterator<Item = &[T]> {
+    #[must_use]
+    pub fn rows(&self) -> impl DoubleEndedIterator<Item = &[T]> + ExactSizeIterator {
         let origin = self.data_origin();
         // SAFETY: The plane creation interface ensures the data is large enough
         let visible_data = unsafe { self.data.get_unchecked(origin..) };
@@ -151,7 +152,7 @@ where
     /// Returns a mutable iterator over the visible pixels of each row
     /// in the plane, from top to bottom.
     #[inline]
-    pub fn rows_mut(&mut self) -> impl Iterator<Item = &mut [T]> {
+    pub fn rows_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut [T]> + ExactSizeIterator {
         let origin = self.data_origin();
         // SAFETY: The plane creation interface ensures the data is large enough
         let visible_data = unsafe { self.data.get_unchecked_mut(origin..) };
@@ -190,42 +191,56 @@ where
     /// Returns an iterator over the visible pixels in the plane,
     /// in row-major order.
     #[inline]
-    pub fn pixels(&self) -> impl Iterator<Item = T> {
-        self.rows().flatten().copied()
+    #[must_use]
+    pub fn pixels(&self) -> impl DoubleEndedIterator<Item = T> + ExactSizeIterator {
+        let total = self.width().get() * self.height().get();
+        ExactSizeWrapper {
+            iter: self.rows().flatten().copied(),
+            len: total,
+        }
     }
 
     /// Returns a mutable iterator over the visible pixels in the plane,
     /// in row-major order.
     #[inline]
-    pub fn pixels_mut(&mut self) -> impl Iterator<Item = &mut T> {
-        self.rows_mut().flatten()
+    pub fn pixels_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut T> + ExactSizeIterator {
+        let total = self.width().get() * self.height().get();
+        ExactSizeWrapper {
+            iter: self.rows_mut().flatten(),
+            len: total,
+        }
     }
 
     /// Returns an iterator over the visible byte data in the plane,
     /// in row-major order. High-bit-depth data is converted to `u8`
     /// using low endianness.
     #[inline]
-    pub fn byte_data(&self) -> impl Iterator<Item = u8> {
+    #[must_use]
+    pub fn byte_data(&self) -> impl DoubleEndedIterator<Item = u8> + ExactSizeIterator {
         let byte_width = size_of::<T>();
         assert!(
             byte_width <= 2,
             "unsupported pixel byte width: {byte_width}"
         );
 
-        self.pixels().flat_map(move |pix| {
-            let bytes: [u8; 2] = if byte_width == 1 {
-                [
-                    pix.to_u8()
-                        .expect("Pixel::byte_data only supports u8 and u16 pixels"),
-                    0,
-                ]
-            } else {
-                pix.to_u16()
-                    .expect("Pixel::byte_data only supports u8 and u16 pixels")
-                    .to_le_bytes()
-            };
-            bytes.into_iter().take(byte_width)
-        })
+        let total = self.width().get() * self.height().get() * byte_width;
+        ExactSizeWrapper {
+            iter: self.pixels().flat_map(move |pix| {
+                let bytes: [u8; 2] = if byte_width == 1 {
+                    [
+                        pix.to_u8()
+                            .expect("Pixel::byte_data only supports u8 and u16 pixels"),
+                        0,
+                    ]
+                } else {
+                    pix.to_u16()
+                        .expect("Pixel::byte_data only supports u8 and u16 pixels")
+                        .to_le_bytes()
+                };
+                bytes.into_iter().take(byte_width)
+            }),
+            len: total,
+        }
     }
 
     /// Copies the data from `src` into this plane's visible pixels.
@@ -415,5 +430,49 @@ impl PlaneGeometry {
         self.height
             .saturating_add(self.pad_top)
             .saturating_add(self.pad_bottom)
+    }
+}
+
+/// Wrapper to add `ExactSizeIterator` implementation to iterators with known length.
+struct ExactSizeWrapper<I> {
+    iter: I,
+    len: usize,
+}
+
+impl<I: Iterator> Iterator for ExactSizeWrapper<I> {
+    type Item = I::Item;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(item) = self.iter.next() {
+            self.len = self.len.saturating_sub(1);
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+}
+
+impl<I: DoubleEndedIterator> DoubleEndedIterator for ExactSizeWrapper<I> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if let Some(item) = self.iter.next_back() {
+            self.len = self.len.saturating_sub(1);
+            Some(item)
+        } else {
+            None
+        }
+    }
+}
+
+impl<I: Iterator> ExactSizeIterator for ExactSizeWrapper<I> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.len
     }
 }

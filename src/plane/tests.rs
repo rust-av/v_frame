@@ -549,3 +549,254 @@ fn pixels_count() {
     let pixel_count = plane.pixels().count();
     assert_eq!(pixel_count, 7 * 11);
 }
+
+#[test]
+fn exact_size_iterator_rows() {
+    let geometry = simple_geometry(4, 3);
+    let plane: Plane<u8> = Plane::new(geometry);
+
+    let mut rows_iter = plane.rows();
+    assert_eq!(rows_iter.len(), 3);
+
+    rows_iter.next();
+    assert_eq!(rows_iter.len(), 2);
+
+    rows_iter.next();
+    assert_eq!(rows_iter.len(), 1);
+
+    rows_iter.next();
+    assert_eq!(rows_iter.len(), 0);
+
+    assert!(rows_iter.next().is_none());
+}
+
+#[test]
+fn exact_size_iterator_pixels() {
+    let geometry = simple_geometry(4, 3);
+    let plane: Plane<u8> = Plane::new(geometry);
+
+    let mut pixels_iter = plane.pixels();
+    assert_eq!(pixels_iter.len(), 12); // 4 * 3
+
+    for i in (0..12).rev() {
+        assert_eq!(pixels_iter.len(), i + 1);
+        pixels_iter.next();
+    }
+
+    assert_eq!(pixels_iter.len(), 0);
+    assert!(pixels_iter.next().is_none());
+}
+
+#[test]
+fn exact_size_iterator_pixels_mut() {
+    let geometry = simple_geometry(3, 2);
+    let mut plane: Plane<u8> = Plane::new(geometry);
+
+    let mut pixels_iter = plane.pixels_mut();
+    assert_eq!(pixels_iter.len(), 6); // 3 * 2
+
+    pixels_iter.next();
+    assert_eq!(pixels_iter.len(), 5);
+}
+
+#[test]
+fn exact_size_iterator_byte_data_u8() {
+    let geometry = simple_geometry(4, 3);
+    let plane: Plane<u8> = Plane::new(geometry);
+
+    let mut bytes_iter = plane.byte_data();
+    assert_eq!(bytes_iter.len(), 12); // 4 * 3 * 1 byte
+
+    bytes_iter.next();
+    assert_eq!(bytes_iter.len(), 11);
+}
+
+#[test]
+fn exact_size_iterator_byte_data_u16() {
+    let geometry = simple_geometry(4, 3);
+    let plane: Plane<u16> = Plane::new(geometry);
+
+    let mut bytes_iter = plane.byte_data();
+    assert_eq!(bytes_iter.len(), 24); // 4 * 3 * 2 bytes
+
+    bytes_iter.next();
+    assert_eq!(bytes_iter.len(), 23);
+}
+
+#[test]
+fn double_ended_iterator_rows() {
+    let geometry = simple_geometry(4, 3);
+    let mut plane: Plane<u8> = Plane::new(geometry);
+
+    // Fill each row with its index
+    for (y, row) in plane.rows_mut().enumerate() {
+        for pixel in row {
+            *pixel = y as u8;
+        }
+    }
+
+    let mut rows_iter = plane.rows();
+    assert_eq!(rows_iter.len(), 3);
+
+    // Get first row
+    let first_row = rows_iter.next().unwrap();
+    assert!(first_row.iter().all(|&p| p == 0));
+    assert_eq!(rows_iter.len(), 2);
+
+    // Get last row
+    let last_row = rows_iter.next_back().unwrap();
+    assert!(last_row.iter().all(|&p| p == 2));
+    assert_eq!(rows_iter.len(), 1);
+
+    // Get middle row
+    let middle_row = rows_iter.next().unwrap();
+    assert!(middle_row.iter().all(|&p| p == 1));
+    assert_eq!(rows_iter.len(), 0);
+}
+
+#[test]
+fn double_ended_iterator_rows_mut() {
+    let geometry = simple_geometry(3, 3);
+    let mut plane: Plane<u8> = Plane::new(geometry);
+
+    let mut rows_iter = plane.rows_mut();
+
+    // Modify first row
+    let first_row = rows_iter.next().unwrap();
+    for pixel in first_row {
+        *pixel = 1;
+    }
+
+    // Modify last row
+    let last_row = rows_iter.next_back().unwrap();
+    for pixel in last_row {
+        *pixel = 3;
+    }
+
+    // Middle row should still be 0
+    let middle_row = rows_iter.next().unwrap();
+    for pixel in middle_row {
+        *pixel = 2;
+    }
+
+    drop(rows_iter);
+
+    // Verify
+    assert_eq!(plane.row(0).unwrap(), &[1, 1, 1]);
+    assert_eq!(plane.row(1).unwrap(), &[2, 2, 2]);
+    assert_eq!(plane.row(2).unwrap(), &[3, 3, 3]);
+}
+
+#[test]
+fn double_ended_iterator_pixels() {
+    let geometry = simple_geometry(3, 2);
+    let mut plane: Plane<u8> = Plane::new(geometry);
+
+    // Fill with sequential values: [0, 1, 2, 3, 4, 5]
+    for (i, pixel) in plane.pixels_mut().enumerate() {
+        *pixel = i as u8;
+    }
+
+    let mut pixels_iter = plane.pixels();
+    assert_eq!(pixels_iter.len(), 6);
+
+    // Get first pixel
+    assert_eq!(pixels_iter.next(), Some(0));
+    assert_eq!(pixels_iter.len(), 5);
+
+    // Get last pixel
+    assert_eq!(pixels_iter.next_back(), Some(5));
+    assert_eq!(pixels_iter.len(), 4);
+
+    // Get second pixel
+    assert_eq!(pixels_iter.next(), Some(1));
+    assert_eq!(pixels_iter.len(), 3);
+
+    // Get second-to-last pixel
+    assert_eq!(pixels_iter.next_back(), Some(4));
+    assert_eq!(pixels_iter.len(), 2);
+
+    // Remaining pixels
+    assert_eq!(pixels_iter.next(), Some(2));
+    assert_eq!(pixels_iter.next(), Some(3));
+    assert_eq!(pixels_iter.len(), 0);
+    assert!(pixels_iter.next().is_none());
+    assert!(pixels_iter.next_back().is_none());
+}
+
+#[test]
+fn double_ended_iterator_pixels_mut() {
+    let geometry = simple_geometry(2, 2);
+    let mut plane: Plane<u8> = Plane::new(geometry);
+
+    let mut pixels_iter = plane.pixels_mut();
+
+    // Set first pixel
+    *pixels_iter.next().unwrap() = 10;
+
+    // Set last pixel
+    *pixels_iter.next_back().unwrap() = 40;
+
+    // Set remaining pixels
+    *pixels_iter.next().unwrap() = 20;
+    *pixels_iter.next().unwrap() = 30;
+
+    drop(pixels_iter);
+
+    // Verify: pixels should be [10, 20, 30, 40]
+    let result: Vec<u8> = plane.pixels().collect();
+    assert_eq!(result, vec![10, 20, 30, 40]);
+}
+
+#[test]
+fn double_ended_iterator_byte_data() {
+    let geometry = simple_geometry(2, 2);
+    let mut plane: Plane<u8> = Plane::new(geometry);
+
+    // Fill with test data: [1, 2, 3, 4]
+    for (i, pixel) in plane.pixels_mut().enumerate() {
+        *pixel = (i + 1) as u8;
+    }
+
+    let mut bytes_iter = plane.byte_data();
+    assert_eq!(bytes_iter.len(), 4);
+
+    // Get first byte
+    assert_eq!(bytes_iter.next(), Some(1));
+    assert_eq!(bytes_iter.len(), 3);
+
+    // Get last byte
+    assert_eq!(bytes_iter.next_back(), Some(4));
+    assert_eq!(bytes_iter.len(), 2);
+
+    // Remaining bytes
+    assert_eq!(bytes_iter.next(), Some(2));
+    assert_eq!(bytes_iter.next_back(), Some(3));
+    assert_eq!(bytes_iter.len(), 0);
+}
+
+#[test]
+fn double_ended_iterator_byte_data_u16() {
+    let geometry = simple_geometry(2, 1);
+    let mut plane: Plane<u16> = Plane::new(geometry);
+
+    // Set two u16 values: 0x0102 and 0x0304
+    *plane.pixel_mut(0, 0).unwrap() = 0x0102;
+    *plane.pixel_mut(1, 0).unwrap() = 0x0304;
+
+    let mut bytes_iter = plane.byte_data();
+    assert_eq!(bytes_iter.len(), 4); // 2 pixels * 2 bytes
+
+    // Get first byte (little endian)
+    assert_eq!(bytes_iter.next(), Some(0x02));
+    assert_eq!(bytes_iter.len(), 3);
+
+    // Get last byte
+    assert_eq!(bytes_iter.next_back(), Some(0x03));
+    assert_eq!(bytes_iter.len(), 2);
+
+    // Remaining bytes
+    assert_eq!(bytes_iter.next(), Some(0x01));
+    assert_eq!(bytes_iter.next_back(), Some(0x04));
+    assert_eq!(bytes_iter.len(), 0);
+}
