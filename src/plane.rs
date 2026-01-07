@@ -137,15 +137,17 @@ where
     #[inline]
     #[must_use]
     pub fn rows(&self) -> impl DoubleEndedIterator<Item = &[T]> + ExactSizeIterator {
-        let origin = self.data_origin();
+        let origin = self.geometry.stride.get() * self.geometry.pad_top;
         // SAFETY: The plane creation interface ensures the data is large enough
         let visible_data = unsafe { self.data.get_unchecked(origin..) };
         visible_data
-            .chunks(self.geometry.stride.get())
+            .chunks_exact(self.geometry.stride.get())
             .take(self.geometry.height.get())
             .map(|row| {
+                let start_idx = self.geometry.pad_left;
+                let end_idx = start_idx + self.geometry.width.get();
                 // SAFETY: The plane creation interface ensures the data is large enough
-                unsafe { row.get_unchecked(..self.geometry.width.get()) }
+                unsafe { row.get_unchecked(start_idx..end_idx) }
             })
     }
 
@@ -153,15 +155,17 @@ where
     /// in the plane, from top to bottom.
     #[inline]
     pub fn rows_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut [T]> + ExactSizeIterator {
-        let origin = self.data_origin();
+        let origin = self.geometry.stride.get() * self.geometry.pad_top;
         // SAFETY: The plane creation interface ensures the data is large enough
         let visible_data = unsafe { self.data.get_unchecked_mut(origin..) };
         visible_data
-            .chunks_mut(self.geometry.stride.get())
+            .chunks_exact_mut(self.geometry.stride.get())
             .take(self.geometry.height.get())
             .map(|row| {
+                let start_idx = self.geometry.pad_left;
+                let end_idx = start_idx + self.geometry.width.get();
                 // SAFETY: The plane creation interface ensures the data is large enough
-                unsafe { row.get_unchecked_mut(..self.geometry.width.get()) }
+                unsafe { row.get_unchecked_mut(start_idx..end_idx) }
             })
     }
 
