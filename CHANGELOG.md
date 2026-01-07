@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.4.2
+
+- Improve performance of `rows` iterators
+
 ## Version 0.4.1
 
 - Implement `ExactSizeIterator` and `DoubleEndedIterator` for plane iterators
