@@ -440,7 +440,7 @@ fn copy_from_u8_slice_with_stride_u16() {
         0x02, 0x01, 0x04, 0x03, 0xFF, 0xFF,  // Row 0
         0x06, 0x05, 0x08, 0x07, 0xFF, 0xFF,  // Row 1
     ];
-    let stride = NonZeroUsize::new(3).unwrap();
+    let stride = NonZeroUsize::new(6).unwrap();
 
     plane.copy_from_u8_slice_with_stride(&data, stride).unwrap();
 
@@ -497,7 +497,7 @@ fn copy_from_u8_slice_with_stride_wrong_length() {
 
     // Should need 3 * 2 * 2 = 12 bytes
     let data = vec![1, 2, 3, 4, 5, 6]; // Only 6 bytes
-    let stride = NonZeroUsize::new(3).unwrap();
+    let stride = NonZeroUsize::new(6).unwrap();
 
     let result = plane.copy_from_u8_slice_with_stride(&data, stride);
     assert!(matches!(result, Err(Error::DataLength { .. })));

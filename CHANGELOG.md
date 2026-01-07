@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.5.0
+
+- [Breaking] Change the `copy_from_u8_slice_with_stride` to take stride in bytes instead of in pixels.
+  This seems to be the more common case from other APIs, and it also addresses a theoretical edge case
+  where stride may not be a multiple of byte depth.
+
 ## Version 0.4.2
 
 - Improve performance of `rows` iterators

@@ -280,12 +280,16 @@ where
     ///   this plane's `width * height * bytes_per_pixel`
     #[inline]
     pub fn copy_from_u8_slice(&mut self, src: &[u8]) -> Result<(), Error> {
-        self.copy_from_u8_slice_with_stride(src, self.width())
+        self.copy_from_u8_slice_with_stride(
+            src,
+            self.width()
+                .saturating_mul(NonZeroUsize::new(size_of::<T>()).expect("size can't be zero")),
+        )
     }
 
     /// Copies the data from `src` into this plane's visible pixels.
     /// This version accepts inputs where the row stride is longer than the visible data width.
-    /// The `input_stride` must be in pixels.
+    /// The `input_stride` must be in bytes.
     ///
     /// # Errors
     /// - Returns `Error::Datalength` if the length of `src` does not match
@@ -310,7 +314,7 @@ where
             });
         }
 
-        let byte_count = input_stride.get() * self.height().get() * byte_width;
+        let byte_count = input_stride.get() * self.height().get();
         if byte_count != src.len() {
             return Err(Error::DataLength {
                 expected: byte_count,
@@ -334,7 +338,7 @@ where
             // u16 pixels - need to convert from little-endian bytes
             let row_byte_width = width * byte_width;
             for (row_idx, dest_row) in self.rows_mut().enumerate() {
-                let src_offset = row_idx * stride * byte_width;
+                let src_offset = row_idx * stride;
                 let src_row = &src[src_offset..src_offset + row_byte_width];
 
                 for (dest_pixel, src_chunk) in dest_row.iter_mut().zip(src_row.chunks_exact(2)) {
