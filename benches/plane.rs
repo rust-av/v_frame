@@ -192,13 +192,13 @@ fn bench_copy_from_u8_slice_with_stride_u16(c: &mut Criterion) {
     let mut plane = create_plane_u16();
     // Add 64 pixels of padding per row for a realistic strided scenario
     let stride = WIDTH + 64;
-    let stride_nz = NonZeroUsize::new(stride).unwrap();
+    let stride_bytes = NonZeroUsize::new(stride * 2).unwrap();
     let source = create_strided_byte_source_u16(stride);
 
     c.bench_function("copy_from_u8_slice_with_stride_u16", |b| {
         b.iter(|| {
             black_box(&mut plane)
-                .copy_from_u8_slice_with_stride(black_box(&source), stride_nz)
+                .copy_from_u8_slice_with_stride(black_box(&source), stride_bytes)
                 .unwrap();
         });
     });
