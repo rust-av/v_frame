@@ -113,6 +113,34 @@ pub struct Frame<T: Pixel> {
     pub bit_depth: NonZeroU8,
 }
 
+impl<T: Pixel> Frame<T> {
+    /// Returns a reference to the plane at the given 0-based index,
+    /// if it exists in the frame. Otherwise, returns `None`.
+    #[inline]
+    #[must_use]
+    pub fn plane(&self, index: usize) -> Option<&Plane<T>> {
+        match index {
+            0 => Some(&self.y_plane),
+            1 => self.u_plane.as_ref(),
+            2 => self.v_plane.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// Returns a mutable reference to the plane at the given 0-based index,
+    /// if it exists in the frame. Otherwise, returns `None`.
+    #[inline]
+    #[must_use]
+    pub fn plane_mut(&mut self, index: usize) -> Option<&mut Plane<T>> {
+        match index {
+            0 => Some(&mut self.y_plane),
+            1 => self.u_plane.as_mut(),
+            2 => self.v_plane.as_mut(),
+            _ => None,
+        }
+    }
+}
+
 /// A builder for constructing [`Frame`] instances with validation.
 ///
 /// `FrameBuilder` uses the builder pattern to construct frames safely, validating
