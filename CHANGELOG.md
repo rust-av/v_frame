@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.5.1
+
+- [Feature] Add index-based plane accessors to `Frame`
+
 ## Version 0.5.0
 
 - [Breaking] Change the `copy_from_u8_slice_with_stride` to take stride in bytes instead of in pixels.
