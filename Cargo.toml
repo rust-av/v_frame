@@ -18,7 +18,7 @@ padding_api = []
 
 # Non-WASM targets use criterion with all default features (including rayon)
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-criterion = "0.6"
+criterion = "0.8"
 
 #
 # WebAssembly/wasm32 target support below
