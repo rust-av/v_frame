@@ -10,7 +10,6 @@ updates:
       include: "scope"
     labels:
       - "dependencies"
-      - "rust"
     groups:
       rust-dependencies:
         patterns:
