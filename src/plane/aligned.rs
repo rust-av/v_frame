@@ -183,3 +183,82 @@ impl<T> Drop for AlignedData<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty() {
+        AlignedData::<u8>::new(0);
+        AlignedData::<u16>::new(0);
+        // would not compile:
+        // AlignedData::<String>::new(0);
+    }
+
+    #[test]
+    fn empty_uninit() {
+        AlignedData::<u8>::new_uninit(0);
+        AlignedData::<u16>::new_uninit(0);
+        AlignedData::<String>::new_uninit(0);
+    }
+
+    #[test]
+    fn basic_zeroed() {
+        let data = AlignedData::<u16>::new(512);
+
+        #[expect(
+            clippy::needless_collect,
+            reason = "explicit collect so we can drop(data) before iterating"
+        )]
+        let vec: Vec<_> = data
+            .iter()
+            .enumerate()
+            .map(|(idx, val)| *val as usize + idx)
+            .collect();
+
+        drop(data);
+
+        for (idx, v) in vec.into_iter().enumerate() {
+            assert_eq!(idx, v);
+        }
+    }
+
+    #[test]
+    fn uninit_manual() {
+        let mut data = AlignedData::<u8>::new_uninit(256);
+        for (idx, x) in data.iter_mut().enumerate() {
+            x.write((idx % 42) as u8);
+        }
+
+        // SAFETY: Initialized above.
+        let data = unsafe { data.assume_init() };
+        println!("{:?}", &data[100..140]);
+    }
+
+    #[test]
+    fn uninit_with_drop() {
+        let mut data = AlignedData::<String>::new_uninit(3);
+        data[0].write("Hello World".into());
+        data[1].write(String::new());
+        data[2].write("This is a test".into());
+
+        // SAFETY: Initialized above.
+        let data = unsafe { data.assume_init() };
+        println!("{:?}", &*data);
+    }
+
+    #[test]
+    fn clone() {
+        let mut data = AlignedData::<String>::new_uninit(3);
+        data[0].write("Hello World".into());
+        data[1].write(String::new());
+        data[2].write("This is a test".into());
+
+        // SAFETY: Initialized above.
+        let data = unsafe { data.assume_init() };
+        let data2 = data.clone();
+        drop(data);
+        println!("{:?}", &*data2);
+    }
+}
