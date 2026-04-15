@@ -254,7 +254,8 @@ where
     ///   this plane's `width * height`
     #[inline]
     pub fn copy_from_slice(&mut self, src: &[T]) -> Result<(), Error> {
-        let pixel_count = self.width().get() * self.height().get();
+        let width = self.width().get();
+        let pixel_count = width * self.height().get();
         if pixel_count != src.len() {
             return Err(Error::DataLength {
                 expected: pixel_count,
@@ -262,9 +263,10 @@ where
             });
         }
 
-        for (dest, src) in self.pixels_mut().zip(src.iter()) {
-            *dest = *src;
+        for (dst_row, src_row) in self.rows_mut().zip(src.chunks_exact(width)) {
+            dst_row.copy_from_slice(src_row);
         }
+
         Ok(())
     }
 
