@@ -10,7 +10,6 @@ include = ["Cargo.toml", "README.md", "LICENSE", "src"]
 
 [dependencies]
 num-traits = "0.2.19"
-thiserror = "2.0.17"
 
 [features]
 padding_api = []
