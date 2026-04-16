@@ -24,6 +24,13 @@
 
 use num_traits::PrimInt;
 
+mod private {
+    pub trait Sealed {}
+
+    impl Sealed for u8 {}
+    impl Sealed for u16 {}
+}
+
 /// A trait for types that can be used as pixel data.
 ///
 /// This trait abstracts over the pixel data types supported by the library,
@@ -41,10 +48,21 @@ use num_traits::PrimInt;
 ///
 /// Attempting to create a frame with a mismatched type will result in
 /// [`Error::DataTypeMismatch`](crate::error::Error::DataTypeMismatch).
-pub trait Pixel: Copy + Clone + Default + Send + Sync + PrimInt + 'static {}
+///
+/// # Safety
+///
+/// All implementing types must be valid if represented by an all-zero byte-pattern,
+/// i.e. using [`std::mem::zeroed`] must __not__ cause undefined behavior for
+/// implementing types.
+pub unsafe trait Pixel:
+    Copy + Clone + Default + Send + Sync + PrimInt + 'static + private::Sealed
+{
+}
 
 /// Pixel implementation for 8-bit video data.
-impl Pixel for u8 {}
+// SAFETY: u8 is valid if represented by a zeroed byte.
+unsafe impl Pixel for u8 {}
 
 /// Pixel implementation for high bit-depth (9-16 bit) video data.
-impl Pixel for u16 {}
+// SAFETY: u16 is valid if represented by zeroed bytes.
+unsafe impl Pixel for u16 {}

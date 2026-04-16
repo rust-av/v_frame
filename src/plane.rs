@@ -33,22 +33,12 @@
 #[cfg(test)]
 mod tests;
 
-use std::{
-    iter,
-    num::{NonZeroU8, NonZeroUsize},
-};
+use std::num::{NonZeroU8, NonZeroUsize};
 
-use aligned_vec::{ABox, AVec, ConstAlign};
+mod aligned;
+use aligned::AlignedData;
 
 use crate::{error::Error, pixel::Pixel};
-
-/// Alignment for plane data on WASM platforms (8 bytes).
-#[cfg(target_arch = "wasm32")]
-const DATA_ALIGNMENT: usize = 1 << 3;
-
-/// Alignment for plane data on non-WASM platforms (64 bytes for SIMD optimization).
-#[cfg(not(target_arch = "wasm32"))]
-const DATA_ALIGNMENT: usize = 1 << 6;
 
 /// A two-dimensional plane of pixel data with optional padding.
 ///
@@ -74,10 +64,10 @@ const DATA_ALIGNMENT: usize = 1 << 6;
 /// - [`rows()`](Plane::rows) / [`rows_mut()`](Plane::rows_mut): Iterate over all visible rows
 /// - [`pixel()`](Plane::pixel) / [`pixel_mut()`](Plane::pixel_mut): Access individual pixels
 /// - [`pixels()`](Plane::pixels) / [`pixels_mut()`](Plane::pixels_mut): Iterate over all visible pixels
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Plane<T: Pixel> {
     /// The underlying pixel data buffer, including padding.
-    pub(crate) data: ABox<[T], ConstAlign<DATA_ALIGNMENT>>,
+    pub(crate) data: AlignedData<T>,
     /// Geometry information describing dimensions and padding.
     pub(crate) geometry: PlaneGeometry,
 }
@@ -92,12 +82,11 @@ where
             .height
             .saturating_add(geometry.pad_top)
             .saturating_add(geometry.pad_bottom);
+
+        let pixels = rows.get() * geometry.stride.get();
+
         Self {
-            data: AVec::from_iter(
-                DATA_ALIGNMENT,
-                iter::repeat_n(T::zero(), geometry.stride.get() * rows.get()),
-            )
-            .into_boxed_slice(),
+            data: AlignedData::new(pixels),
             geometry,
         }
     }
@@ -137,11 +126,9 @@ where
     #[inline]
     #[must_use]
     pub fn rows(&self) -> impl DoubleEndedIterator<Item = &[T]> + ExactSizeIterator {
-        let origin = self.geometry.stride.get() * self.geometry.pad_top;
-        // SAFETY: The plane creation interface ensures the data is large enough
-        let visible_data = unsafe { self.data.get_unchecked(origin..) };
-        visible_data
+        self.data
             .chunks_exact(self.geometry.stride.get())
+            .skip(self.geometry.pad_top)
             .take(self.geometry.height.get())
             .map(|row| {
                 let start_idx = self.geometry.pad_left;
@@ -155,11 +142,9 @@ where
     /// in the plane, from top to bottom.
     #[inline]
     pub fn rows_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut [T]> + ExactSizeIterator {
-        let origin = self.geometry.stride.get() * self.geometry.pad_top;
-        // SAFETY: The plane creation interface ensures the data is large enough
-        let visible_data = unsafe { self.data.get_unchecked_mut(origin..) };
-        visible_data
+        self.data
             .chunks_exact_mut(self.geometry.stride.get())
+            .skip(self.geometry.pad_top)
             .take(self.geometry.height.get())
             .map(|row| {
                 let start_idx = self.geometry.pad_left;
