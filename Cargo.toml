@@ -14,9 +14,10 @@ num-traits = "0.2.19"
 [features]
 padding_api = []
 
-# Non-WASM targets use criterion with all default features (including rayon)
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-criterion = "0.8"
+[dev-dependencies.criterion]
+version = "0.8"
+default-features = false
+features = ["plotters", "cargo_bench_support"]
 
 #
 # WebAssembly/wasm32 target support below
@@ -41,18 +42,6 @@ wasm-bindgen = "0.2"
 
 [target.wasm32-unknown-unknown.dev-dependencies]
 wasm-bindgen-test = "0.3"
-# Disable rayon feature for WASM compatibility
-criterion = { version = "0.6", default-features = false, features = [
-    "plotters",
-    "cargo_bench_support",
-] }
-
-[target.wasm32-wasi.dev-dependencies]
-# Disable rayon feature for WASM compatibility
-criterion = { version = "0.6", default-features = false, features = [
-    "plotters",
-    "cargo_bench_support",
-] }
 
 [[bench]]
 name = "plane"
