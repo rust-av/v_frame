@@ -148,6 +148,9 @@ fn unsupported_bit_depth_too_high() {
         result,
         Err(Error::UnsupportedBitDepth { found: 17 })
     ));
+    assert!(
+        format!("{}", result.err().unwrap()).starts_with("only 8-16 bit frame data is supported,")
+    );
 }
 
 #[test]
@@ -160,6 +163,7 @@ fn data_type_mismatch_u8_with_10bit() {
         FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth).build::<u8>();
 
     assert!(matches!(result, Err(Error::DataTypeMismatch)));
+    assert!(format!("{}", result.err().unwrap()).starts_with("bit depth did not match"));
 }
 
 #[test]
@@ -184,6 +188,10 @@ fn yuv420_odd_width_resolution_error() {
         FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth).build::<u8>();
 
     assert!(matches!(result, Err(Error::UnsupportedResolution)));
+    assert!(
+        format!("{}", result.err().unwrap())
+            .starts_with("selected chroma subsampling does not support")
+    );
 }
 
 #[test]
