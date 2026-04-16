@@ -63,6 +63,10 @@ pub enum Error {
 }
 
 impl fmt::Display for Error {
+    #[expect(
+        clippy::missing_inline_in_public_items,
+        reason = "string formatting often generates big code"
+    )]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::DataLength { expected, found } => write!(
