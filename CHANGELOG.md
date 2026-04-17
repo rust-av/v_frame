@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.5.2
+
+- perf: copy_from_slice per row
+- refactor: remove aligned-vec dependency
+
 ## Version 0.5.1
 
 - [Feature] Add index-based plane accessors to `Frame`
