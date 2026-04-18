@@ -33,6 +33,8 @@
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "padding_api")]
+use std::mem::MaybeUninit;
 use std::num::{NonZeroU8, NonZeroUsize};
 
 mod aligned;
@@ -65,32 +67,14 @@ use crate::{error::Error, pixel::Pixel};
 /// - [`pixel()`](Plane::pixel) / [`pixel_mut()`](Plane::pixel_mut): Access individual pixels
 /// - [`pixels()`](Plane::pixels) / [`pixels_mut()`](Plane::pixels_mut): Iterate over all visible pixels
 #[derive(Debug, Clone)]
-pub struct Plane<T: Pixel> {
+pub struct Plane<T> {
     /// The underlying pixel data buffer, including padding.
     pub(crate) data: AlignedData<T>,
     /// Geometry information describing dimensions and padding.
     pub(crate) geometry: PlaneGeometry,
 }
 
-impl<T> Plane<T>
-where
-    T: Pixel,
-{
-    /// Creates a new plane with the given geometry, initialized with zero-valued pixels.
-    pub(crate) fn new(geometry: PlaneGeometry) -> Self {
-        let rows = geometry
-            .height
-            .saturating_add(geometry.pad_top)
-            .saturating_add(geometry.pad_bottom);
-
-        let pixels = rows.get() * geometry.stride.get();
-
-        Self {
-            data: AlignedData::new(pixels),
-            geometry,
-        }
-    }
-
+impl<T> Plane<T> {
     /// Returns the visible width of the plane in pixels
     #[inline]
     #[must_use]
@@ -103,6 +87,127 @@ where
     #[must_use]
     pub fn height(&self) -> NonZeroUsize {
         self.geometry.height
+    }
+
+    /// Returns the index for the first visible pixel in `data`.
+    ///
+    /// This is a low-level API intended only for functions that require access to the padding.
+    #[inline]
+    #[must_use]
+    #[cfg_attr(not(feature = "padding_api"), doc(hidden))]
+    pub fn data_origin(&self) -> usize {
+        self.geometry.stride.get() * self.geometry.pad_top + self.geometry.pad_left
+    }
+}
+
+#[cfg(feature = "padding_api")]
+impl<T> Plane<T> {
+    /// Creates a new plane with the given [`PlaneGeometry`] over unitialized memory.
+    ///
+    /// The underlying data needs to be initialized before this plane can be
+    /// converted and used in a [`Frame`][crate::frame::Frame].
+    ///
+    /// [`data_mut`][Plane::data_mut] can be used to initialize the underlying memory.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::num::{NonZeroU8, NonZeroUsize};
+    /// use v_frame::plane::{Plane, PlaneGeometry};
+    ///
+    /// let other_data = vec![42u8; 120 * 80];
+    ///
+    /// let geometry = PlaneGeometry {
+    ///     width: const { NonZeroUsize::new(120).unwrap() },
+    ///     height: const { NonZeroUsize::new(80).unwrap() },
+    ///     stride: const { NonZeroUsize::new(120).unwrap() },
+    ///     pad_left: 0,
+    ///     pad_right: 0,
+    ///     pad_top: 0,
+    ///     pad_bottom: 0,
+    ///     subsampling_x: const { NonZeroU8::new(1).unwrap() },
+    ///     subsampling_y: const { NonZeroU8::new(1).unwrap() },
+    /// };
+    ///
+    /// let mut plane = Plane::new_uninit(geometry);
+    /// assert_eq!(plane.data_mut().len(), other_data.len());
+    /// for (dst, src) in plane.data_mut().iter_mut().zip(other_data) {
+    ///     dst.write(src);
+    /// }
+    ///
+    /// // SAFETY: All values initialized above
+    /// let plane = unsafe { plane.assume_init() };
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn new_uninit(geometry: PlaneGeometry) -> Plane<MaybeUninit<T>> {
+        let rows = geometry.alloc_height();
+        let pixels = rows.saturating_mul(geometry.stride);
+
+        Plane {
+            data: AlignedData::new_uninit(pixels.get()),
+            geometry,
+        }
+    }
+
+    /// Returns the geometry of the current plane.
+    ///
+    /// This is a low-level API intended only for functions that require access to the padding.
+    #[inline]
+    #[must_use]
+    pub fn geometry(&self) -> PlaneGeometry {
+        self.geometry
+    }
+
+    /// Returns a reference to the current plane's data, including padding.
+    ///
+    /// This is a low-level API intended only for functions that require access to the padding.
+    #[inline]
+    #[must_use]
+    pub fn data(&self) -> &[T] {
+        &self.data
+    }
+
+    /// Returns a mutable reference to the current plane's data, including padding.
+    ///
+    /// This is a low-level API intended only for functions that require access to the padding.
+    #[inline]
+    #[must_use]
+    pub fn data_mut(&mut self) -> &mut [T] {
+        &mut self.data
+    }
+}
+
+#[cfg(feature = "padding_api")]
+impl<T> Plane<MaybeUninit<T>> {
+    /// Converts to `Plane<T>`.
+    ///
+    /// # Safety
+    /// It is up to the caller to ensure that all contained values are
+    /// initialized properly (see [`MaybeUninit::assume_init`]).
+    #[inline]
+    #[must_use]
+    pub unsafe fn assume_init(self) -> Plane<T> {
+        // SAFETY: Safety invariants are upheld by the caller.
+        let data = unsafe { self.data.assume_init() };
+
+        Plane {
+            data,
+            geometry: self.geometry,
+        }
+    }
+}
+
+impl<T: Pixel> Plane<T> {
+    /// Creates a new plane with the given geometry, initialized with zero-valued pixels.
+    pub(crate) fn new(geometry: PlaneGeometry) -> Self {
+        let rows = geometry.alloc_height();
+        let pixels = rows.get() * geometry.stride.get();
+
+        Self {
+            data: AlignedData::new(pixels),
+            geometry,
+        }
     }
 
     /// Returns a slice containing the visible pixels in
@@ -341,46 +446,6 @@ where
 
         Ok(())
     }
-
-    /// Returns the geometry of the current plane.
-    ///
-    /// This is a low-level API intended only for functions that require access to the padding.
-    #[inline]
-    #[must_use]
-    #[cfg(feature = "padding_api")]
-    pub fn geometry(&self) -> PlaneGeometry {
-        self.geometry
-    }
-
-    /// Returns a reference to the current plane's data, including padding.
-    ///
-    /// This is a low-level API intended only for functions that require access to the padding.
-    #[inline]
-    #[must_use]
-    #[cfg(feature = "padding_api")]
-    pub fn data(&self) -> &[T] {
-        &self.data
-    }
-
-    /// Returns a mutable reference to the current plane's data, including padding.
-    ///
-    /// This is a low-level API intended only for functions that require access to the padding.
-    #[inline]
-    #[must_use]
-    #[cfg(feature = "padding_api")]
-    pub fn data_mut(&mut self) -> &mut [T] {
-        &mut self.data
-    }
-
-    /// Returns the index for the first visible pixel in `data`.
-    ///
-    /// This is a low-level API intended only for functions that require access to the padding.
-    #[inline]
-    #[must_use]
-    #[cfg_attr(not(feature = "padding_api"), doc(hidden))]
-    pub fn data_origin(&self) -> usize {
-        self.geometry.stride.get() * self.geometry.pad_top + self.geometry.pad_left
-    }
 }
 
 /// Describes the geometry of a plane, including dimensions and padding.
@@ -392,7 +457,6 @@ where
 /// The `stride` represents the number of pixels per row in the data buffer,
 /// which is equal to `width + pad_left + pad_right`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(not(feature = "padding_api"), doc(hidden))]
 pub struct PlaneGeometry {
     /// Width of the visible area in pixels.
     pub width: NonZeroUsize,

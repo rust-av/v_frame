@@ -8,6 +8,11 @@ use std::hint::black_box;
 use std::num::{NonZeroU8, NonZeroUsize};
 use v_frame::{chroma::ChromaSubsampling, frame::FrameBuilder, plane::Plane};
 
+#[cfg(feature = "padding_api")]
+use std::mem::MaybeUninit;
+#[cfg(feature = "padding_api")]
+use v_frame::plane::PlaneGeometry;
+
 /// Standard HD resolution for benchmarks (1920x1080)
 const WIDTH: usize = 1920;
 const HEIGHT: usize = 1080;
@@ -36,6 +41,46 @@ fn create_plane_u16() -> Plane<u16> {
         .unwrap();
 
     frame.y_plane
+}
+
+#[cfg(feature = "padding_api")]
+/// Creates an uninitialized test plane for 8-bit benchmarks
+fn create_uninit_plane_u8() -> Plane<MaybeUninit<u8>> {
+    let width = NonZeroUsize::new(WIDTH).unwrap();
+    let height = NonZeroUsize::new(HEIGHT).unwrap();
+    let geometry = PlaneGeometry {
+        width,
+        height,
+        stride: width,
+        pad_left: 0,
+        pad_right: 0,
+        pad_top: 0,
+        pad_bottom: 0,
+        subsampling_x: NonZeroU8::new(1).unwrap(),
+        subsampling_y: NonZeroU8::new(1).unwrap(),
+    };
+
+    Plane::new_uninit(geometry)
+}
+
+#[cfg(feature = "padding_api")]
+/// Creates an uninitialized test plane for 10-bit benchmarks (using u16)
+fn create_uninit_plane_u16() -> Plane<MaybeUninit<u16>> {
+    let width = NonZeroUsize::new(WIDTH).unwrap();
+    let height = NonZeroUsize::new(HEIGHT).unwrap();
+    let geometry = PlaneGeometry {
+        width,
+        height,
+        stride: width,
+        pad_left: 0,
+        pad_right: 0,
+        pad_top: 0,
+        pad_bottom: 0,
+        subsampling_x: NonZeroU8::new(1).unwrap(),
+        subsampling_y: NonZeroU8::new(1).unwrap(),
+    };
+
+    Plane::new_uninit(geometry)
 }
 
 /// Creates source data for copy benchmarks (u8)
@@ -146,6 +191,42 @@ fn bench_copy_from_slice_u16(c: &mut Criterion) {
     });
 }
 
+#[cfg(feature = "padding_api")]
+fn bench_uninit_copy_from_slice_u8(c: &mut Criterion) {
+    let mut plane = create_uninit_plane_u8();
+    let source = create_source_u8();
+
+    c.bench_function("uninit_copy_from_slice_u8", |b| {
+        b.iter(|| {
+            for (dst, src) in black_box(&mut plane)
+                .data_mut()
+                .iter_mut()
+                .zip(black_box(&source))
+            {
+                dst.write(*src);
+            }
+        });
+    });
+}
+
+#[cfg(feature = "padding_api")]
+fn bench_uninit_copy_from_slice_u16(c: &mut Criterion) {
+    let mut plane = create_uninit_plane_u16();
+    let source = create_source_u16();
+
+    c.bench_function("uninit_copy_from_slice_u16", |b| {
+        b.iter(|| {
+            for (dst, src) in black_box(&mut plane)
+                .data_mut()
+                .iter_mut()
+                .zip(black_box(&source))
+            {
+                dst.write(*src);
+            }
+        });
+    });
+}
+
 fn bench_copy_from_u8_slice_u8(c: &mut Criterion) {
     let mut plane = create_plane_u8();
     let source = create_byte_source_u8();
@@ -204,6 +285,13 @@ fn bench_copy_from_u8_slice_with_stride_u16(c: &mut Criterion) {
     });
 }
 
+#[cfg(feature = "padding_api")]
+criterion_group!(
+    padding_api_benches,
+    bench_uninit_copy_from_slice_u8,
+    bench_uninit_copy_from_slice_u16,
+);
+
 criterion_group!(
     benches,
     bench_pixels_u8,
@@ -217,4 +305,9 @@ criterion_group!(
     bench_copy_from_u8_slice_with_stride_u8,
     bench_copy_from_u8_slice_with_stride_u16
 );
+
+#[cfg(not(feature = "padding_api"))]
 criterion_main!(benches);
+
+#[cfg(feature = "padding_api")]
+criterion_main!(benches, padding_api_benches);
