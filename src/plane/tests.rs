@@ -257,6 +257,7 @@ fn copy_from_slice_wrong_length() {
     let data = vec![1, 2, 3];
     let result = plane.copy_from_slice(&data);
     assert!(matches!(result, Err(Error::DataLength { .. })));
+    assert!(format!("{}", result.unwrap_err()).starts_with("data length mismatch,"));
 
     // Too long
     let data = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -477,6 +478,7 @@ fn copy_from_u8_slice_with_stride_invalid_stride() {
 
     let result = plane.copy_from_u8_slice_with_stride(&data, stride);
     assert!(matches!(result, Err(Error::InvalidStride { .. })));
+    assert!(format!("{}", result.unwrap_err()).starts_with("provided stride"));
 }
 
 #[test]
