@@ -99,7 +99,7 @@ use crate::{
 };
 
 /// Contains the data representing one YUV video frame.
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Frame<T: Pixel> {
     /// The luma plane for this frame
     pub y_plane: Plane<T>,

@@ -16,6 +16,7 @@ const DATA_ALIGNMENT: usize = 1 << 3;
 #[cfg(not(target_arch = "wasm32"))]
 const DATA_ALIGNMENT: usize = 1 << 6;
 
+#[derive(PartialEq, Eq)]
 pub struct AlignedData<T> {
     ptr: NonNull<[T]>,
     _marker: PhantomData<T>,
