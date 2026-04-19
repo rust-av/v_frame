@@ -383,6 +383,18 @@ fn padding_api_geometry() {
 
 #[cfg(feature = "padding_api")]
 #[test]
+fn padding_api_geometry_alloc_height() {
+    let geometry = padded_geometry(2, 2, 1, 1, 1, 1);
+    let plane: Plane<u8> = Plane::new(geometry);
+
+    assert_eq!(
+        plane.data().len(),
+        geometry.alloc_height().get() * geometry.stride.get()
+    );
+}
+
+#[cfg(feature = "padding_api")]
+#[test]
 fn padding_api_data_access() {
     let geometry = padded_geometry(2, 2, 1, 1, 1, 1);
     let mut plane: Plane<u8> = Plane::new(geometry);
