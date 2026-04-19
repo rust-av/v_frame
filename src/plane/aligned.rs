@@ -204,6 +204,13 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "invalid layout")]
+    fn invalid_layout_panic() {
+        let too_big = isize::MAX as usize + 100;
+        AlignedData::<u8>::new_uninit(too_big);
+    }
+
+    #[test]
     fn basic_zeroed() {
         let data = AlignedData::<u16>::new(512);
 
@@ -246,6 +253,18 @@ mod tests {
         // SAFETY: Initialized above.
         let data = unsafe { data.assume_init() };
         println!("{:?}", &*data);
+    }
+
+    #[test]
+    fn debug_fmt() {
+        let mut data = AlignedData::<u8>::new(12);
+        data[4] = 42;
+        data[10] = 123;
+
+        assert_eq!(
+            format!("{data:?}"),
+            "[0, 0, 0, 0, 42, 0, 0, 0, 0, 0, 123, 0]"
+        );
     }
 
     #[test]
