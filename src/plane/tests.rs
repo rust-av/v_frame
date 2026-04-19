@@ -403,6 +403,26 @@ fn padding_api_data_access() {
     }
 }
 
+#[cfg(feature = "padding_api")]
+#[test]
+fn padding_api_data_access_uninit() {
+    let geometry = padded_geometry(2, 2, 1, 1, 1, 1);
+    let mut plane = Plane::new_uninit(geometry);
+
+    // Fill all data including padding
+    for (i, pixel) in plane.data_mut().iter_mut().enumerate() {
+        pixel.write(i as u8);
+    }
+
+    // SAFETY: Everything was initialized above.
+    let plane = unsafe { plane.assume_init() };
+
+    // Verify we can read it back
+    for (i, &pixel) in plane.data().iter().enumerate() {
+        assert_eq!(pixel, i as u8);
+    }
+}
+
 #[test]
 fn copy_from_u8_slice_with_stride_u8() {
     let geometry = simple_geometry(3, 2);
