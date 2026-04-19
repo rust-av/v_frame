@@ -13,6 +13,48 @@ use super::*;
 use crate::chroma::ChromaSubsampling;
 
 #[test]
+fn plane_access() {
+    let width = NonZeroUsize::new(1920).unwrap();
+    let height = NonZeroUsize::new(1080).unwrap();
+    let bit_depth = NonZeroU8::new(8).unwrap();
+
+    let mut frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+        .build::<u8>()
+        .unwrap();
+
+    let y_ptr = frame.y_plane.data.as_ptr();
+    assert_eq!(y_ptr, frame.plane(0).expect("plane 0 exists").data.as_ptr());
+    assert_eq!(
+        y_ptr,
+        frame.plane_mut(0).expect("plane 0 exists").data.as_ptr()
+    );
+
+    let u_ptr = frame
+        .u_plane
+        .as_ref()
+        .expect("plane 1 exists")
+        .data
+        .as_ptr();
+    assert_eq!(u_ptr, frame.plane(1).expect("plane 1 exists").data.as_ptr());
+    assert_eq!(
+        u_ptr,
+        frame.plane_mut(1).expect("plane 1 exists").data.as_ptr()
+    );
+
+    let v_ptr = frame
+        .v_plane
+        .as_ref()
+        .expect("plane 2 exists")
+        .data
+        .as_ptr();
+    assert_eq!(v_ptr, frame.plane(2).expect("plane 2 exists").data.as_ptr());
+    assert_eq!(
+        v_ptr,
+        frame.plane_mut(2).expect("plane 2 exists").data.as_ptr()
+    );
+}
+
+#[test]
 fn basic_8bit_frame() {
     let width = NonZeroUsize::new(1920).unwrap();
     let height = NonZeroUsize::new(1080).unwrap();
