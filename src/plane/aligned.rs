@@ -133,7 +133,11 @@ impl<T> DerefMut for AlignedData<T> {
 
 impl<T: Debug> Debug for AlignedData<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        <[T] as Debug>::fmt(self, f)
+        if self.len() > 5 {
+            f.debug_list().entries(&self[..5]).finish_non_exhaustive()
+        } else {
+            f.debug_list().entries(&self[..]).finish()
+        }
     }
 }
 
@@ -261,10 +265,12 @@ mod tests {
         data[4] = 42;
         data[10] = 123;
 
-        assert_eq!(
-            format!("{data:?}"),
-            "[0, 0, 0, 0, 42, 0, 0, 0, 0, 0, 123, 0]"
-        );
+        assert_eq!(format!("{data:?}"), "[0, 0, 0, 0, 42, ..]");
+
+        let mut data = AlignedData::<u8>::new(3);
+        data[1] = 7;
+        // don't panic when len < 5
+        assert_eq!(format!("{data:?}"), "[0, 7, 0]");
     }
 
     #[test]
