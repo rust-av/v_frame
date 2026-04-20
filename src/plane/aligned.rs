@@ -16,7 +16,6 @@ const DATA_ALIGNMENT: usize = 1 << 3;
 #[cfg(not(target_arch = "wasm32"))]
 const DATA_ALIGNMENT: usize = 1 << 6;
 
-#[derive(PartialEq, Eq)]
 pub struct AlignedData<T> {
     ptr: NonNull<[T]>,
     _marker: PhantomData<T>,
@@ -131,6 +130,14 @@ impl<T> DerefMut for AlignedData<T> {
         unsafe { self.ptr.as_mut() }
     }
 }
+
+impl<T: PartialEq<U>, U> PartialEq<AlignedData<U>> for AlignedData<T> {
+    fn eq(&self, other: &AlignedData<U>) -> bool {
+        <[T] as PartialEq<[U]>>::eq(self, other)
+    }
+}
+
+impl<T: Eq> Eq for AlignedData<T> {}
 
 impl<T: Debug> Debug for AlignedData<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -258,6 +265,53 @@ mod tests {
         // SAFETY: Initialized above.
         let data = unsafe { data.assume_init() };
         println!("{:?}", &*data);
+    }
+
+    #[test]
+    fn partialeq() {
+        let mut data = AlignedData::<u8>::new(8);
+        data[4] = 42;
+        data[6] = 123;
+
+        assert_eq!(data, data.clone());
+
+        let other_data = AlignedData::<u8>::new(8);
+        assert_ne!(data, other_data);
+
+        let mut other_data = data.clone();
+        other_data[2] = 50;
+        assert_ne!(data, other_data);
+
+        // does not compile:
+        // let u16_data = AlignedData::<u16>::new(10);
+        // assert_ne!(data, u16_data);
+    }
+
+    #[test]
+    fn partialeq_different_types() {
+        #[derive(Debug)]
+        struct Test(u8);
+
+        impl PartialEq<u8> for Test {
+            fn eq(&self, other: &u8) -> bool {
+                self.0.eq(other)
+            }
+        }
+
+        let mut data = AlignedData::<u8>::new(3);
+        data[0] = 42;
+
+        let mut test_data = AlignedData::<Test>::new_uninit(3);
+        test_data[0].write(Test(0));
+        test_data[1].write(Test(0));
+        test_data[2].write(Test(0));
+
+        // SAFETY: Fully initialized above.
+        let mut test_data = unsafe { test_data.assume_init() };
+        assert_ne!(test_data, data);
+
+        test_data[0] = Test(42);
+        assert_eq!(test_data, data);
     }
 
     #[test]
