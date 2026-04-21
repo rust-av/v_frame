@@ -7,7 +7,7 @@
 // Media Patent License 1.0 was not distributed with this source code in the
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
-use std::fmt;
+use core::fmt;
 
 /// An error representing why data couldn't be copied into a Plane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -50,4 +50,4 @@ impl fmt::Display for CopyError {
     }
 }
 
-impl std::error::Error for CopyError {}
+impl core::error::Error for CopyError {}

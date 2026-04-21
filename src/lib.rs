@@ -33,6 +33,10 @@
 //!     .unwrap();
 //! ```
 
+#![no_std]
+
+extern crate alloc;
+
 pub mod chroma;
 pub mod frame;
 pub mod pixel;

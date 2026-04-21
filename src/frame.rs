@@ -81,7 +81,7 @@ pub use error::FrameError;
 #[cfg(test)]
 mod tests;
 
-use std::num::NonZeroU8;
+use core::num::NonZeroU8;
 
 use crate::{
     chroma::ChromaSubsampling,

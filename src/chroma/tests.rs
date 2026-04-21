@@ -10,7 +10,7 @@
 #![allow(clippy::unwrap_used, reason = "test file")]
 
 use super::*;
-use std::num::NonZeroU8;
+use core::num::NonZeroU8;
 
 #[test]
 fn has_chroma() {

@@ -56,7 +56,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::num::NonZeroU8;
+use core::num::NonZeroU8;
 
 /// Specifies the chroma subsampling for a YUV frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
