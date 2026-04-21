@@ -1,9 +1,11 @@
-use std::alloc::{Layout, alloc, alloc_zeroed, dealloc, handle_alloc_error};
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::mem::{ManuallyDrop, MaybeUninit, align_of};
-use std::ops::{Deref, DerefMut};
-use std::ptr::NonNull;
+use alloc::alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error};
+
+use core::alloc::Layout;
+use core::fmt::{self, Debug};
+use core::marker::PhantomData;
+use core::mem::{ManuallyDrop, MaybeUninit};
+use core::ops::{Deref, DerefMut};
+use core::ptr::NonNull;
 
 use crate::pixel::Pixel;
 
@@ -148,7 +150,7 @@ impl<T: PartialEq<U>, U> PartialEq<AlignedData<U>> for AlignedData<T> {
 impl<T: Eq> Eq for AlignedData<T> {}
 
 impl<T: Debug> Debug for AlignedData<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.len() > 5 {
             f.debug_list().entries(&self[..5]).finish_non_exhaustive()
         } else {
@@ -208,6 +210,8 @@ impl<T> Drop for AlignedData<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use alloc::{format, string::String, vec::Vec};
 
     #[test]
     fn empty() {
@@ -295,19 +299,24 @@ mod tests {
 
         // SAFETY: Initialized above.
         let data = unsafe { data.assume_init() };
-        println!("{:?}", &data[100..140]);
+        for (idx, x) in data[100..140].iter().enumerate() {
+            let idx = 100 + idx;
+            assert_eq!(*x, (idx % 42) as u8);
+        }
     }
 
     #[test]
     fn uninit_with_drop() {
         let mut data = AlignedData::<String>::new_uninit(3);
-        data[0].write("Hello World".into());
+        data[0].write(String::from("Hello World"));
         data[1].write(String::new());
-        data[2].write("This is a test".into());
+        data[2].write(String::from("This is a test"));
 
         // SAFETY: Initialized above.
         let data = unsafe { data.assume_init() };
-        println!("{:?}", &*data);
+        assert_eq!(data[0], String::from("Hello World"));
+        assert_eq!(data[1], String::new());
+        assert_eq!(data[2], String::from("This is a test"));
     }
 
     #[test]
@@ -374,14 +383,16 @@ mod tests {
     #[test]
     fn clone() {
         let mut data = AlignedData::<String>::new_uninit(3);
-        data[0].write("Hello World".into());
+        data[0].write(String::from("Hello World"));
         data[1].write(String::new());
-        data[2].write("This is a test".into());
+        data[2].write(String::from("This is a test"));
 
         // SAFETY: Initialized above.
         let data = unsafe { data.assume_init() };
         let data2 = data.clone();
         drop(data);
-        println!("{:?}", &*data2);
+        assert_eq!(data2[0], String::from("Hello World"));
+        assert_eq!(data2[1], String::new());
+        assert_eq!(data2[2], String::from("This is a test"));
     }
 }

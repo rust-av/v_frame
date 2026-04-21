@@ -11,6 +11,8 @@
 
 use super::*;
 
+use alloc::{format, vec, vec::Vec};
+
 /// Helper function to create a simple plane geometry without padding
 fn simple_geometry(width: usize, height: usize) -> PlaneGeometry {
     PlaneGeometry::unpadded(width, height, 1, 1).expect("can create simple geometry")

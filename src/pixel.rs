@@ -22,8 +22,8 @@
 //! - 8-bit frames must use `u8`
 //! - 9-16 bit frames must use `u16`
 
+use core::fmt::Debug;
 use num_traits::PrimInt;
-use std::fmt::Debug;
 
 mod private {
     pub trait Sealed {}
