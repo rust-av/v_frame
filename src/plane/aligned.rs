@@ -131,9 +131,21 @@ impl<T> DerefMut for AlignedData<T> {
     }
 }
 
+impl<T: PartialEq<U>, U> PartialEq<AlignedData<U>> for AlignedData<T> {
+    fn eq(&self, other: &AlignedData<U>) -> bool {
+        <[T] as PartialEq<[U]>>::eq(self, other)
+    }
+}
+
+impl<T: Eq> Eq for AlignedData<T> {}
+
 impl<T: Debug> Debug for AlignedData<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        <[T] as Debug>::fmt(self, f)
+        if self.len() > 5 {
+            f.debug_list().entries(&self[..5]).finish_non_exhaustive()
+        } else {
+            f.debug_list().entries(&self[..]).finish()
+        }
     }
 }
 
@@ -256,15 +268,64 @@ mod tests {
     }
 
     #[test]
+    fn partialeq() {
+        let mut data = AlignedData::<u8>::new(8);
+        data[4] = 42;
+        data[6] = 123;
+
+        assert_eq!(data, data.clone());
+
+        let other_data = AlignedData::<u8>::new(8);
+        assert_ne!(data, other_data);
+
+        let mut other_data = data.clone();
+        other_data[2] = 50;
+        assert_ne!(data, other_data);
+
+        // does not compile:
+        // let u16_data = AlignedData::<u16>::new(10);
+        // assert_ne!(data, u16_data);
+    }
+
+    #[test]
+    fn partialeq_different_types() {
+        #[derive(Debug)]
+        struct Test(u8);
+
+        impl PartialEq<u8> for Test {
+            fn eq(&self, other: &u8) -> bool {
+                self.0.eq(other)
+            }
+        }
+
+        let mut data = AlignedData::<u8>::new(3);
+        data[0] = 42;
+
+        let mut test_data = AlignedData::<Test>::new_uninit(3);
+        test_data[0].write(Test(0));
+        test_data[1].write(Test(0));
+        test_data[2].write(Test(0));
+
+        // SAFETY: Fully initialized above.
+        let mut test_data = unsafe { test_data.assume_init() };
+        assert_ne!(test_data, data);
+
+        test_data[0] = Test(42);
+        assert_eq!(test_data, data);
+    }
+
+    #[test]
     fn debug_fmt() {
         let mut data = AlignedData::<u8>::new(12);
         data[4] = 42;
         data[10] = 123;
 
-        assert_eq!(
-            format!("{data:?}"),
-            "[0, 0, 0, 0, 42, 0, 0, 0, 0, 0, 123, 0]"
-        );
+        assert_eq!(format!("{data:?}"), "[0, 0, 0, 0, 42, ..]");
+
+        let mut data = AlignedData::<u8>::new(3);
+        data[1] = 7;
+        // don't panic when len < 5
+        assert_eq!(format!("{data:?}"), "[0, 7, 0]");
     }
 
     #[test]

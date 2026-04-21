@@ -355,6 +355,35 @@ fn plane_clone() {
 }
 
 #[test]
+fn plane_debug() {
+    let geometry = simple_geometry(3, 3);
+    let mut plane: Plane<u8> = Plane::new(geometry);
+
+    // Fill with test data
+    for (i, pixel) in plane.pixels_mut().enumerate() {
+        *pixel = i as u8;
+    }
+
+    assert_eq!(
+        format!("{plane:?}"),
+        "Plane { \
+            data: [0, 1, 2, 3, 4, ..], \
+            geometry: PlaneGeometry { \
+                width: 3, \
+                height: 3, \
+                stride: 3, \
+                pad_left: 0, \
+                pad_right: 0, \
+                pad_top: 0, \
+                pad_bottom: 0, \
+                subsampling_x: 1, \
+                subsampling_y: 1 \
+            } \
+        }"
+    );
+}
+
+#[test]
 fn data_origin_no_padding() {
     let geometry = simple_geometry(4, 4);
     let plane: Plane<u8> = Plane::new(geometry);

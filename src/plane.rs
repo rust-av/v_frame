@@ -66,7 +66,7 @@ use crate::{error::Error, pixel::Pixel};
 /// - [`rows()`](Plane::rows) / [`rows_mut()`](Plane::rows_mut): Iterate over all visible rows
 /// - [`pixel()`](Plane::pixel) / [`pixel_mut()`](Plane::pixel_mut): Access individual pixels
 /// - [`pixels()`](Plane::pixels) / [`pixels_mut()`](Plane::pixels_mut): Iterate over all visible pixels
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Plane<T> {
     /// The underlying pixel data buffer, including padding.
     pub(crate) data: AlignedData<T>,

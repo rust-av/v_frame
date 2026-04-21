@@ -23,6 +23,7 @@
 //! - 9-16 bit frames must use `u16`
 
 use num_traits::PrimInt;
+use std::fmt::Debug;
 
 mod private {
     pub trait Sealed {}
@@ -55,7 +56,7 @@ mod private {
 /// i.e. using [`std::mem::zeroed`] must __not__ cause undefined behavior for
 /// implementing types.
 pub unsafe trait Pixel:
-    Copy + Clone + Default + Send + Sync + PrimInt + 'static + private::Sealed
+    Debug + Copy + Clone + Default + Send + Sync + PrimInt + 'static + private::Sealed
 {
 }
 
