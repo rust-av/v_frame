@@ -10,7 +10,7 @@
 #![allow(clippy::unwrap_used, reason = "test file")]
 
 use super::*;
-use std::num::NonZeroUsize;
+use std::num::{NonZeroU8, NonZeroUsize};
 
 /// Helper function to create a simple plane geometry without padding
 fn simple_geometry(width: usize, height: usize) -> PlaneGeometry {
