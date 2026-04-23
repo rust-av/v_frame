@@ -10,23 +10,11 @@
 #![allow(clippy::unwrap_used, reason = "test file")]
 
 use super::*;
-use std::num::{NonZeroU8, NonZeroUsize};
+use std::num::NonZeroUsize;
 
 /// Helper function to create a simple plane geometry without padding
 fn simple_geometry(width: usize, height: usize) -> PlaneGeometry {
-    let width = NonZeroUsize::new(width).unwrap();
-    let height = NonZeroUsize::new(height).unwrap();
-    PlaneGeometry {
-        width,
-        height,
-        stride: width,
-        pad_left: 0,
-        pad_right: 0,
-        pad_top: 0,
-        pad_bottom: 0,
-        subsampling_x: NonZeroU8::new(1).unwrap(),
-        subsampling_y: NonZeroU8::new(1).unwrap(),
-    }
+    PlaneGeometry::unpadded(width, height, 1, 1).expect("can create simple geometry")
 }
 
 /// Helper function to create a plane geometry with padding
@@ -38,20 +26,10 @@ fn padded_geometry(
     pad_top: usize,
     pad_bottom: usize,
 ) -> PlaneGeometry {
-    let width = NonZeroUsize::new(width).unwrap();
-    let height = NonZeroUsize::new(height).unwrap();
-    let stride = NonZeroUsize::new(width.get() + pad_left + pad_right).unwrap();
-    PlaneGeometry {
-        width,
-        height,
-        stride,
-        pad_left,
-        pad_right,
-        pad_top,
-        pad_bottom,
-        subsampling_x: NonZeroU8::new(1).unwrap(),
-        subsampling_y: NonZeroU8::new(1).unwrap(),
-    }
+    PlaneGeometry::new(
+        width, height, pad_left, pad_right, pad_top, pad_bottom, 1, 1,
+    )
+    .expect("can create padded geometry")
 }
 
 #[test]
