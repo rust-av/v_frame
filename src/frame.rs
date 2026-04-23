@@ -22,7 +22,7 @@
 //! - **V plane**: Second chroma component (Cr), present unless monochrome
 //!
 //! The relative dimensions of the chroma planes are determined by the
-//! [`ChromaSubsampling`](crate::chroma::ChromaSubsampling) format.
+//! [`ChromaSubsampling`] format.
 //!
 //! # Type Safety
 //!
@@ -31,8 +31,7 @@
 //! - Use `Frame<u16>` for high bit-depth (9-16 bit) video
 //!
 //! The builder validates that the pixel type matches the specified bit depth,
-//! returning [`Error::DataTypeMismatch`](crate::error::Error::DataTypeMismatch) if they
-//! don't align.
+//! returning [`Error::DataTypeMismatch`] if they don't align.
 //!
 //! # Padding
 //!
