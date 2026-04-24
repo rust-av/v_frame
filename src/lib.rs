@@ -29,11 +29,7 @@
 //! use std::num::{NonZeroU8, NonZeroUsize};
 //!
 //! // Create a 1920x1080 YUV420 8-bit frame
-//! let width = NonZeroUsize::new(1920).unwrap();
-//! let height = NonZeroUsize::new(1080).unwrap();
-//! let bit_depth = NonZeroU8::new(8).unwrap();
-//!
-//! let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+//! let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
 //!     .build::<u8>()
 //!     .unwrap();
 //! ```

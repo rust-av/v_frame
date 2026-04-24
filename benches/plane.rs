@@ -19,11 +19,7 @@ const HEIGHT: usize = 1080;
 
 /// Creates a test plane for 8-bit benchmarks
 fn create_plane_u8() -> Plane<u8> {
-    let width = NonZeroUsize::new(WIDTH).unwrap();
-    let height = NonZeroUsize::new(HEIGHT).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let frame = FrameBuilder::new(WIDTH, HEIGHT, ChromaSubsampling::Yuv420, 8)
         .build::<u8>()
         .unwrap();
 
@@ -32,11 +28,7 @@ fn create_plane_u8() -> Plane<u8> {
 
 /// Creates a test plane for 10-bit benchmarks (using u16)
 fn create_plane_u16() -> Plane<u16> {
-    let width = NonZeroUsize::new(WIDTH).unwrap();
-    let height = NonZeroUsize::new(HEIGHT).unwrap();
-    let bit_depth = NonZeroU8::new(10).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let frame = FrameBuilder::new(WIDTH, HEIGHT, ChromaSubsampling::Yuv420, 10)
         .build::<u16>()
         .unwrap();
 
