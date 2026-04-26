@@ -11,8 +11,6 @@ use v_frame::{chroma::ChromaSubsampling, frame::FrameBuilder, plane::Plane};
 #[cfg(feature = "padding_api")]
 use std::mem::MaybeUninit;
 #[cfg(feature = "padding_api")]
-use std::num::NonZeroU8;
-#[cfg(feature = "padding_api")]
 use v_frame::plane::PlaneGeometry;
 
 /// Standard HD resolution for benchmarks (1920x1080)
