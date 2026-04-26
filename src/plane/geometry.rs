@@ -11,6 +11,7 @@ use crate::chroma::ChromaSubsampling;
 /// The `stride` represents the number of pixels per row in the data buffer,
 /// which is equal to `width + pad_left + pad_right`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(clippy::manual_non_exhaustive)]
 pub struct PlaneGeometry {
     /// Width of the visible area in pixels.
     pub width: NonZeroUsize,
@@ -32,6 +33,9 @@ pub struct PlaneGeometry {
     /// The horizontal subsampling ratio of this plane compared to the luma plane
     /// Will be 1 if no subsampling
     pub subsampling_y: NonZeroU8,
+
+    // No manual instantiation outside of this module
+    _marker: (),
 }
 
 impl PlaneGeometry {
@@ -70,6 +74,7 @@ impl PlaneGeometry {
             pad_bottom,
             subsampling_x,
             subsampling_y,
+            _marker: (),
         })
     }
 

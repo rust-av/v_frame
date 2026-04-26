@@ -46,40 +46,14 @@ fn create_plane_u16() -> Plane<u16> {
 #[cfg(feature = "padding_api")]
 /// Creates an uninitialized test plane for 8-bit benchmarks
 fn create_uninit_plane_u8() -> Plane<MaybeUninit<u8>> {
-    let width = NonZeroUsize::new(WIDTH).unwrap();
-    let height = NonZeroUsize::new(HEIGHT).unwrap();
-    let geometry = PlaneGeometry {
-        width,
-        height,
-        stride: width,
-        pad_left: 0,
-        pad_right: 0,
-        pad_top: 0,
-        pad_bottom: 0,
-        subsampling_x: NonZeroU8::new(1).unwrap(),
-        subsampling_y: NonZeroU8::new(1).unwrap(),
-    };
-
+    let geometry = PlaneGeometry::unpadded(WIDTH, HEIGHT, 1, 1).expect("can build geometry");
     Plane::new_uninit(geometry)
 }
 
 #[cfg(feature = "padding_api")]
 /// Creates an uninitialized test plane for 10-bit benchmarks (using u16)
 fn create_uninit_plane_u16() -> Plane<MaybeUninit<u16>> {
-    let width = NonZeroUsize::new(WIDTH).unwrap();
-    let height = NonZeroUsize::new(HEIGHT).unwrap();
-    let geometry = PlaneGeometry {
-        width,
-        height,
-        stride: width,
-        pad_left: 0,
-        pad_right: 0,
-        pad_top: 0,
-        pad_bottom: 0,
-        subsampling_x: NonZeroU8::new(1).unwrap(),
-        subsampling_y: NonZeroU8::new(1).unwrap(),
-    };
-
+    let geometry = PlaneGeometry::unpadded(WIDTH, HEIGHT, 1, 1).expect("can build geometry");
     Plane::new_uninit(geometry)
 }
 
