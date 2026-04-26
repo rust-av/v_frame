@@ -5,11 +5,13 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::hint::black_box;
-use std::num::{NonZeroU8, NonZeroUsize};
+use std::num::NonZeroUsize;
 use v_frame::{chroma::ChromaSubsampling, frame::FrameBuilder, plane::Plane};
 
 #[cfg(feature = "padding_api")]
 use std::mem::MaybeUninit;
+#[cfg(feature = "padding_api")]
+use std::num::NonZeroU8;
 #[cfg(feature = "padding_api")]
 use v_frame::plane::PlaneGeometry;
 
