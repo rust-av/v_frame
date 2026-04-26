@@ -10,7 +10,6 @@
 #![allow(clippy::unwrap_used, reason = "test file")]
 
 use super::*;
-use std::num::NonZeroUsize;
 
 /// Helper function to create a simple plane geometry without padding
 fn simple_geometry(width: usize, height: usize) -> PlaneGeometry {
@@ -452,9 +451,8 @@ fn copy_from_u8_slice_with_stride_u8() {
     // Row 0: [10, 20, 30, PAD, PAD]
     // Row 1: [40, 50, 60, PAD, PAD]
     let data = vec![10, 20, 30, 99, 99, 40, 50, 60, 99, 99];
-    let stride = NonZeroUsize::new(5).unwrap();
 
-    plane.copy_from_u8_slice_with_stride(&data, stride).unwrap();
+    plane.copy_from_u8_slice_with_stride(&data, 5).unwrap();
 
     // Verify only the visible pixels were copied (padding should be ignored)
     assert_eq!(plane.pixel(0, 0).unwrap(), 10);
@@ -481,9 +479,8 @@ fn copy_from_u8_slice_with_stride_u16() {
         0x02, 0x01, 0x04, 0x03, 0xFF, 0xFF,  // Row 0
         0x06, 0x05, 0x08, 0x07, 0xFF, 0xFF,  // Row 1
     ];
-    let stride = NonZeroUsize::new(6).unwrap();
 
-    plane.copy_from_u8_slice_with_stride(&data, stride).unwrap();
+    plane.copy_from_u8_slice_with_stride(&data, 6).unwrap();
 
     // Verify only the visible pixels were copied
     assert_eq!(plane.pixel(0, 0).unwrap(), 0x0102);
@@ -499,9 +496,8 @@ fn copy_from_u8_slice_with_stride_equal_width() {
 
     // When stride == width, should delegate to copy_from_u8_slice
     let data = vec![1, 2, 3, 4, 5, 6];
-    let stride = NonZeroUsize::new(3).unwrap();
 
-    plane.copy_from_u8_slice_with_stride(&data, stride).unwrap();
+    plane.copy_from_u8_slice_with_stride(&data, 3).unwrap();
 
     let result: Vec<u8> = plane.pixels().collect();
     assert_eq!(result, data);
@@ -514,9 +510,8 @@ fn copy_from_u8_slice_with_stride_invalid_stride() {
 
     // Stride smaller than width is invalid
     let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
-    let stride = NonZeroUsize::new(4).unwrap();
 
-    let result = plane.copy_from_u8_slice_with_stride(&data, stride);
+    let result = plane.copy_from_u8_slice_with_stride(&data, 4);
     assert!(matches!(result, Err(Error::InvalidStride { .. })));
     assert!(format!("{}", result.unwrap_err()).starts_with("provided stride"));
 }
@@ -528,9 +523,8 @@ fn copy_from_u8_slice_with_stride_wrong_length() {
 
     // Should need stride * height = 3 * 2 = 6 bytes
     let data = vec![1, 2, 3, 4]; // Only 4 bytes
-    let stride = NonZeroUsize::new(3).unwrap();
 
-    let result = plane.copy_from_u8_slice_with_stride(&data, stride);
+    let result = plane.copy_from_u8_slice_with_stride(&data, 3);
     assert!(matches!(result, Err(Error::DataLength { .. })));
 
     // u16 case: should need stride * height * 2 bytes
@@ -539,9 +533,8 @@ fn copy_from_u8_slice_with_stride_wrong_length() {
 
     // Should need 3 * 2 * 2 = 12 bytes
     let data = vec![1, 2, 3, 4, 5, 6]; // Only 6 bytes
-    let stride = NonZeroUsize::new(6).unwrap();
 
-    let result = plane.copy_from_u8_slice_with_stride(&data, stride);
+    let result = plane.copy_from_u8_slice_with_stride(&data, 6);
     assert!(matches!(result, Err(Error::DataLength { .. })));
 }
 
