@@ -48,11 +48,7 @@
 //! use std::num::{NonZeroU8, NonZeroUsize};
 //!
 //! // Create a 1920x1080 YUV420 8-bit frame
-//! let width = NonZeroUsize::new(1920).unwrap();
-//! let height = NonZeroUsize::new(1080).unwrap();
-//! let bit_depth = NonZeroU8::new(8).unwrap();
-//!
-//! let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+//! let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
 //!     .build::<u8>()
 //!     .unwrap();
 //!
@@ -73,11 +69,7 @@
 //! use v_frame::chroma::ChromaSubsampling;
 //! use std::num::{NonZeroU8, NonZeroUsize};
 //!
-//! let width = NonZeroUsize::new(1920).unwrap();
-//! let height = NonZeroUsize::new(1080).unwrap();
-//! let bit_depth = NonZeroU8::new(10).unwrap();
-//!
-//! let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+//! let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 10)
 //! .luma_padding_left(16)
 //! .luma_padding_right(16)
 //! .luma_padding_top(16)
@@ -88,7 +80,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::num::{NonZeroU8, NonZeroUsize};
+use std::num::NonZeroU8;
 
 use crate::{
     chroma::ChromaSubsampling,
@@ -166,25 +158,20 @@ impl<T: Pixel> Frame<T> {
 /// use v_frame::chroma::ChromaSubsampling;
 /// use std::num::{NonZeroU8, NonZeroUsize};
 ///
-/// let frame = FrameBuilder::new(
-///     NonZeroUsize::new(1920).unwrap(),
-///     NonZeroUsize::new(1080).unwrap(),
-///     ChromaSubsampling::Yuv420,
-///     NonZeroU8::new(8).unwrap(),
-/// )
+/// let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
 /// .luma_padding_left(8)
 /// .luma_padding_right(8)
 /// .build::<u8>().unwrap();
 /// ```
 pub struct FrameBuilder {
     /// Visible width in pixels.
-    width: NonZeroUsize,
+    width: usize,
     /// Visible height in pixels.
-    height: NonZeroUsize,
+    height: usize,
     /// Chroma subsampling format.
     subsampling: ChromaSubsampling,
     /// Bit depth of the frame's pixels (8-16).
-    bit_depth: NonZeroU8,
+    bit_depth: u8,
     /// Number of padding pixels on the left of the luma plane.
     luma_padding_left: usize,
     /// Number of padding pixels on the right of the luma plane.
@@ -200,12 +187,7 @@ impl FrameBuilder {
     /// The builder then allows for setting additional, optional parameters.
     #[inline]
     #[must_use]
-    pub fn new(
-        width: NonZeroUsize,
-        height: NonZeroUsize,
-        subsampling: ChromaSubsampling,
-        bit_depth: NonZeroU8,
-    ) -> Self {
+    pub fn new(width: usize, height: usize, subsampling: ChromaSubsampling, bit_depth: u8) -> Self {
         Self {
             width,
             height,
@@ -260,26 +242,25 @@ impl FrameBuilder {
     ///   do not support the requested subsampling
     #[inline]
     pub fn build<T: Pixel>(self) -> Result<Frame<T>, Error> {
-        if self.bit_depth.get() < 8 || self.bit_depth.get() > 16 {
+        let byte_width = const {
+            let sz = size_of::<T>();
+            assert!(sz > 0 && sz <= 2, "T must have a size of 1 or 2 bytes");
+            sz
+        };
+
+        if self.bit_depth < 8 || self.bit_depth > 16 {
             return Err(Error::UnsupportedBitDepth {
-                found: self.bit_depth.get(),
+                found: self.bit_depth,
             });
         }
 
-        let byte_width = size_of::<T>();
-        assert!(
-            byte_width <= 2,
-            "unsupported pixel byte width: {byte_width}"
-        );
-        if (byte_width == 1 && self.bit_depth.get() != 8)
-            || (byte_width == 2 && self.bit_depth.get() <= 8)
-        {
+        if (byte_width == 1 && self.bit_depth != 8) || (byte_width == 2 && self.bit_depth <= 8) {
             return Err(Error::DataTypeMismatch);
         }
 
         let Some(luma_geometry) = PlaneGeometry::new(
-            self.width.get(),
-            self.height.get(),
+            self.width,
+            self.height,
             self.luma_padding_left,
             self.luma_padding_right,
             self.luma_padding_top,
@@ -301,7 +282,8 @@ impl FrameBuilder {
             u_plane,
             v_plane,
             subsampling: self.subsampling,
-            bit_depth: self.bit_depth,
+            bit_depth: NonZeroU8::new(self.bit_depth)
+                .ok_or(Error::UnsupportedBitDepth { found: 0 })?,
         })
     }
 }

@@ -14,11 +14,7 @@ use crate::chroma::ChromaSubsampling;
 
 #[test]
 fn plane_access() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let mut frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let mut frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
         .build::<u8>()
         .unwrap();
 
@@ -56,11 +52,7 @@ fn plane_access() {
 
 #[test]
 fn basic_8bit_frame() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
         .build::<u8>()
         .unwrap();
 
@@ -72,11 +64,7 @@ fn basic_8bit_frame() {
 
 #[test]
 fn basic_10bit_frame() {
-    let width = NonZeroUsize::new(3840).unwrap();
-    let height = NonZeroUsize::new(2160).unwrap();
-    let bit_depth = NonZeroU8::new(10).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let frame = FrameBuilder::new(3840, 2160, ChromaSubsampling::Yuv420, 10)
         .build::<u16>()
         .unwrap();
 
@@ -87,11 +75,7 @@ fn basic_10bit_frame() {
 
 #[test]
 fn yuv420_chroma_dimensions() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
         .build::<u8>()
         .unwrap();
 
@@ -107,11 +91,7 @@ fn yuv420_chroma_dimensions() {
 
 #[test]
 fn yuv422_chroma_dimensions() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv422, bit_depth)
+    let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv422, 8)
         .build::<u8>()
         .unwrap();
 
@@ -127,11 +107,7 @@ fn yuv422_chroma_dimensions() {
 
 #[test]
 fn yuv444_chroma_dimensions() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv444, bit_depth)
+    let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv444, 8)
         .build::<u8>()
         .unwrap();
 
@@ -147,11 +123,7 @@ fn yuv444_chroma_dimensions() {
 
 #[test]
 fn monochrome_no_chroma_planes() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Monochrome, bit_depth)
+    let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Monochrome, 8)
         .build::<u8>()
         .unwrap();
 
@@ -164,12 +136,7 @@ fn monochrome_no_chroma_planes() {
 
 #[test]
 fn unsupported_bit_depth_too_low() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(7).unwrap();
-
-    let result =
-        FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth).build::<u8>();
+    let result = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 7).build::<u8>();
 
     assert!(matches!(
         result,
@@ -179,12 +146,7 @@ fn unsupported_bit_depth_too_low() {
 
 #[test]
 fn unsupported_bit_depth_too_high() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(17).unwrap();
-
-    let result =
-        FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth).build::<u16>();
+    let result = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 17).build::<u16>();
 
     assert!(matches!(
         result,
@@ -197,12 +159,7 @@ fn unsupported_bit_depth_too_high() {
 
 #[test]
 fn data_type_mismatch_u8_with_10bit() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(10).unwrap();
-
-    let result =
-        FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth).build::<u8>();
+    let result = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 10).build::<u8>();
 
     assert!(matches!(result, Err(Error::DataTypeMismatch)));
     assert!(format!("{}", result.err().unwrap()).starts_with("bit depth did not match"));
@@ -210,24 +167,14 @@ fn data_type_mismatch_u8_with_10bit() {
 
 #[test]
 fn data_type_mismatch_u16_with_8bit() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let result =
-        FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth).build::<u16>();
+    let result = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8).build::<u16>();
 
     assert!(matches!(result, Err(Error::DataTypeMismatch)));
 }
 
 #[test]
 fn yuv420_odd_width_resolution_error() {
-    let width = NonZeroUsize::new(1921).unwrap(); // odd width
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let result =
-        FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth).build::<u8>();
+    let result = FrameBuilder::new(1921, 1080, ChromaSubsampling::Yuv420, 8).build::<u8>();
 
     assert!(matches!(result, Err(Error::UnsupportedResolution)));
     assert!(
@@ -238,35 +185,21 @@ fn yuv420_odd_width_resolution_error() {
 
 #[test]
 fn yuv420_odd_height_resolution_error() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1081).unwrap(); // odd height
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let result =
-        FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth).build::<u8>();
+    let result = FrameBuilder::new(1920, 1081, ChromaSubsampling::Yuv420, 8).build::<u8>();
 
     assert!(matches!(result, Err(Error::UnsupportedResolution)));
 }
 
 #[test]
 fn yuv422_odd_width_resolution_error() {
-    let width = NonZeroUsize::new(1921).unwrap(); // odd width
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let result =
-        FrameBuilder::new(width, height, ChromaSubsampling::Yuv422, bit_depth).build::<u8>();
+    let result = FrameBuilder::new(1921, 1080, ChromaSubsampling::Yuv422, 8).build::<u8>();
 
     assert!(matches!(result, Err(Error::UnsupportedResolution)));
 }
 
 #[test]
 fn frame_with_luma_padding() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
         .luma_padding_left(16)
         .luma_padding_right(16)
         .luma_padding_top(16)
@@ -281,11 +214,7 @@ fn frame_with_luma_padding() {
 
 #[test]
 fn chroma_padding_derived_from_luma_yuv420() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
         .luma_padding_left(16)
         .luma_padding_right(16)
         .luma_padding_top(16)
@@ -301,11 +230,7 @@ fn chroma_padding_derived_from_luma_yuv420() {
 
 #[test]
 fn padding_not_aligned_to_subsampling_yuv420() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let result = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let result = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
         // Not divisible by 2 for YUV420
         .luma_padding_left(15)
         .build::<u8>();
@@ -315,11 +240,7 @@ fn padding_not_aligned_to_subsampling_yuv420() {
 
 #[test]
 fn padding_not_aligned_to_subsampling_yuv422() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let result = FrameBuilder::new(width, height, ChromaSubsampling::Yuv422, bit_depth)
+    let result = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv422, 8)
         // Not divisible by 2 for YUV422
         .luma_padding_left(15)
         .build::<u8>();
@@ -329,11 +250,7 @@ fn padding_not_aligned_to_subsampling_yuv422() {
 
 #[test]
 fn yuv444_padding_any_value() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let result = FrameBuilder::new(width, height, ChromaSubsampling::Yuv444, bit_depth)
+    let result = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv444, 8)
         // Any value works for YUV444
         .luma_padding_left(15)
         .build::<u8>();
@@ -343,11 +260,7 @@ fn yuv444_padding_any_value() {
 
 #[test]
 fn monochrome_padding_any_value() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let result = FrameBuilder::new(width, height, ChromaSubsampling::Monochrome, bit_depth)
+    let result = FrameBuilder::new(1920, 1080, ChromaSubsampling::Monochrome, 8)
         .luma_padding_left(15)
         .luma_padding_right(17)
         .luma_padding_top(13)
@@ -359,11 +272,7 @@ fn monochrome_padding_any_value() {
 
 #[test]
 fn frame_clone() {
-    let width = NonZeroUsize::new(640).unwrap();
-    let height = NonZeroUsize::new(480).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let frame = FrameBuilder::new(640, 480, ChromaSubsampling::Yuv420, 8)
         .build::<u8>()
         .unwrap();
 
@@ -377,20 +286,18 @@ fn frame_clone() {
 
 #[test]
 fn all_supported_bit_depths() {
-    let width = NonZeroUsize::new(640).unwrap();
-    let height = NonZeroUsize::new(480).unwrap();
+    let width = 640;
+    let height = 480;
 
     // Test 8-bit with u8
-    let bit_depth_8 = NonZeroU8::new(8).unwrap();
     assert!(
-        FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth_8)
+        FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, 8)
             .build::<u8>()
             .is_ok()
     );
 
     // Test 9-16 bit with u16
-    for depth in 9..=16 {
-        let bit_depth = NonZeroU8::new(depth).unwrap();
+    for bit_depth in 9..=16 {
         assert!(
             FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
                 .build::<u16>()
@@ -401,11 +308,7 @@ fn all_supported_bit_depths() {
 
 #[test]
 fn small_resolution() {
-    let width = NonZeroUsize::new(2).unwrap();
-    let height = NonZeroUsize::new(2).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let frame = FrameBuilder::new(2, 2, ChromaSubsampling::Yuv420, 8)
         .build::<u8>()
         .unwrap();
 
@@ -419,11 +322,7 @@ fn small_resolution() {
 
 #[test]
 fn builder_setters() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
         .luma_padding_left(8)
         .luma_padding_right(8)
         .luma_padding_top(8)
@@ -435,11 +334,7 @@ fn builder_setters() {
 
 #[test]
 fn asymmetric_padding() {
-    let width = NonZeroUsize::new(1920).unwrap();
-    let height = NonZeroUsize::new(1080).unwrap();
-    let bit_depth = NonZeroU8::new(8).unwrap();
-
-    let frame = FrameBuilder::new(width, height, ChromaSubsampling::Yuv420, bit_depth)
+    let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
         .luma_padding_left(8)
         .luma_padding_right(16)
         .luma_padding_top(4)
