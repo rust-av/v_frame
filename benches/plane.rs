@@ -5,7 +5,6 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::hint::black_box;
-use std::num::NonZeroUsize;
 use v_frame::{chroma::ChromaSubsampling, frame::FrameBuilder, plane::Plane};
 
 #[cfg(feature = "padding_api")]
@@ -223,13 +222,12 @@ fn bench_copy_from_u8_slice_with_stride_u8(c: &mut Criterion) {
     let mut plane = create_plane_u8();
     // Add 64 pixels of padding per row for a realistic strided scenario
     let stride = WIDTH + 64;
-    let stride_nz = NonZeroUsize::new(stride).unwrap();
     let source = create_strided_byte_source_u8(stride);
 
     c.bench_function("copy_from_u8_slice_with_stride_u8", |b| {
         b.iter(|| {
             black_box(&mut plane)
-                .copy_from_u8_slice_with_stride(black_box(&source), stride_nz)
+                .copy_from_u8_slice_with_stride(black_box(&source), stride)
                 .unwrap();
         });
     });
@@ -239,7 +237,7 @@ fn bench_copy_from_u8_slice_with_stride_u16(c: &mut Criterion) {
     let mut plane = create_plane_u16();
     // Add 64 pixels of padding per row for a realistic strided scenario
     let stride = WIDTH + 64;
-    let stride_bytes = NonZeroUsize::new(stride * 2).unwrap();
+    let stride_bytes = stride * 2;
     let source = create_strided_byte_source_u16(stride);
 
     c.bench_function("copy_from_u8_slice_with_stride_u16", |b| {

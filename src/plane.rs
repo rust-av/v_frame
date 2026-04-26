@@ -366,11 +366,7 @@ impl<T: Pixel> Plane<T> {
     ///   this plane's `width * height * bytes_per_pixel`
     #[inline]
     pub fn copy_from_u8_slice(&mut self, src: &[u8]) -> Result<(), Error> {
-        self.copy_from_u8_slice_with_stride(
-            src,
-            self.width()
-                .saturating_mul(NonZeroUsize::new(size_of::<T>()).expect("size can't be zero")),
-        )
+        self.copy_from_u8_slice_with_stride(src, self.width().get() * size_of::<T>())
     }
 
     /// Copies the data from `src` into this plane's visible pixels.
@@ -385,7 +381,7 @@ impl<T: Pixel> Plane<T> {
     pub fn copy_from_u8_slice_with_stride(
         &mut self,
         src: &[u8],
-        input_stride: NonZeroUsize,
+        stride: usize,
     ) -> Result<(), Error> {
         let byte_width = size_of::<T>();
         assert!(
@@ -393,14 +389,14 @@ impl<T: Pixel> Plane<T> {
             "unsupported pixel byte width: {byte_width}"
         );
 
-        if input_stride < self.width() {
+        if stride < self.width().get() {
             return Err(Error::InvalidStride {
-                stride: input_stride.get(),
+                stride,
                 width: self.width().get(),
             });
         }
 
-        let byte_count = input_stride.get() * self.height().get();
+        let byte_count = stride * self.height().get();
         if byte_count != src.len() {
             return Err(Error::DataLength {
                 expected: byte_count,
@@ -409,8 +405,6 @@ impl<T: Pixel> Plane<T> {
         }
 
         let width = self.width().get();
-        let stride = input_stride.get();
-
         if byte_width == 1 {
             // Fast path for u8 pixels
             for (row_idx, dest_row) in self.rows_mut().enumerate() {
