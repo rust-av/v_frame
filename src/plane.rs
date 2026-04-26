@@ -120,17 +120,8 @@ impl<T> Plane<T> {
     ///
     /// let other_data = vec![42u8; 120 * 80];
     ///
-    /// let geometry = PlaneGeometry {
-    ///     width: const { NonZeroUsize::new(120).unwrap() },
-    ///     height: const { NonZeroUsize::new(80).unwrap() },
-    ///     stride: const { NonZeroUsize::new(120).unwrap() },
-    ///     pad_left: 0,
-    ///     pad_right: 0,
-    ///     pad_top: 0,
-    ///     pad_bottom: 0,
-    ///     subsampling_x: const { NonZeroU8::new(1).unwrap() },
-    ///     subsampling_y: const { NonZeroU8::new(1).unwrap() },
-    /// };
+    /// let geometry = PlaneGeometry::unpadded(120, 80, 1, 1)
+    ///     .expect("can build geometry");
     ///
     /// let mut plane = Plane::new_uninit(geometry);
     /// assert_eq!(plane.data_mut().len(), other_data.len());

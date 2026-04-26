@@ -355,7 +355,8 @@ fn plane_debug() {
                 pad_top: 0, \
                 pad_bottom: 0, \
                 subsampling_x: 1, \
-                subsampling_y: 1 \
+                subsampling_y: 1, \
+                _marker: () \
             } \
         }"
     );
