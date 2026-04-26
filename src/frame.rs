@@ -277,69 +277,29 @@ impl FrameBuilder {
             return Err(Error::DataTypeMismatch);
         }
 
-        let luma_stride = self
-            .width
-            .saturating_add(self.luma_padding_left)
-            .saturating_add(self.luma_padding_right);
-        let luma_geometry = PlaneGeometry {
-            width: self.width,
-            height: self.height,
-            stride: luma_stride,
-            pad_left: self.luma_padding_left,
-            pad_right: self.luma_padding_right,
-            pad_top: self.luma_padding_top,
-            pad_bottom: self.luma_padding_bottom,
-            subsampling_x: NonZeroU8::new(1).expect("non-zero constant"),
-            subsampling_y: NonZeroU8::new(1).expect("non-zero constant"),
-        };
-        if !self.subsampling.has_chroma() {
-            return Ok(Frame {
-                y_plane: Plane::new(luma_geometry),
-                u_plane: None,
-                v_plane: None,
-                subsampling: self.subsampling,
-                bit_depth: self.bit_depth,
-            });
-        }
-
-        let Some((chroma_width, chroma_height)) = self
-            .subsampling
-            .chroma_dimensions(self.width.get(), self.height.get())
-        else {
+        let Some(luma_geometry) = PlaneGeometry::new(
+            self.width.get(),
+            self.height.get(),
+            self.luma_padding_left,
+            self.luma_padding_right,
+            self.luma_padding_top,
+            self.luma_padding_bottom,
+            1,
+            1,
+        ) else {
             return Err(Error::UnsupportedResolution);
         };
 
-        let (ss_x, ss_y) = self.subsampling.subsample_ratio().expect("not monochrome");
-        if self.luma_padding_left % ss_x.get() as usize > 0
-            || self.luma_padding_right % ss_x.get() as usize > 0
-            || self.luma_padding_top % ss_y.get() as usize > 0
-            || self.luma_padding_bottom % ss_y.get() as usize > 0
-        {
-            return Err(Error::UnsupportedResolution);
-        }
-        let chroma_padding_left = self.luma_padding_left / ss_x.get() as usize;
-        let chroma_padding_right = self.luma_padding_right / ss_x.get() as usize;
-        let chroma_padding_top = self.luma_padding_top / ss_y.get() as usize;
-        let chroma_padding_bottom = self.luma_padding_bottom / ss_y.get() as usize;
-        let chroma_stride = chroma_width
-            .saturating_add(chroma_padding_left)
-            .saturating_add(chroma_padding_right);
-
-        let chroma_geometry = PlaneGeometry {
-            width: NonZeroUsize::new(chroma_width).expect("cannot be zero"),
-            height: NonZeroUsize::new(chroma_height).expect("cannot be zero"),
-            stride: NonZeroUsize::new(chroma_stride).expect("cannot be zero"),
-            pad_left: chroma_padding_left,
-            pad_right: chroma_padding_right,
-            pad_top: chroma_padding_top,
-            pad_bottom: chroma_padding_bottom,
-            subsampling_x: ss_x,
-            subsampling_y: ss_y,
+        let (u_plane, v_plane) = match luma_geometry.for_subsampling(self.subsampling) {
+            Ok(Some(g)) => (Some(Plane::new(g)), Some(Plane::new(g))),
+            Ok(None) => (None, None),
+            Err(_) => return Err(Error::UnsupportedResolution),
         };
+
         Ok(Frame {
             y_plane: Plane::new(luma_geometry),
-            u_plane: Some(Plane::new(chroma_geometry)),
-            v_plane: Some(Plane::new(chroma_geometry)),
+            u_plane,
+            v_plane,
             subsampling: self.subsampling,
             bit_depth: self.bit_depth,
         })
