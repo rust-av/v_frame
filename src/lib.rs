@@ -26,7 +26,6 @@
 //! ```rust
 //! use v_frame::frame::FrameBuilder;
 //! use v_frame::chroma::ChromaSubsampling;
-//! use std::num::{NonZeroU8, NonZeroUsize};
 //!
 //! // Create a 1920x1080 YUV420 8-bit frame
 //! let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
