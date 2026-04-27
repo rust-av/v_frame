@@ -45,7 +45,6 @@
 //! ```rust
 //! use v_frame::frame::FrameBuilder;
 //! use v_frame::chroma::ChromaSubsampling;
-//! use std::num::{NonZeroU8, NonZeroUsize};
 //!
 //! // Create a 1920x1080 YUV420 8-bit frame
 //! let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
@@ -67,7 +66,6 @@
 //! ```rust
 //! use v_frame::frame::FrameBuilder;
 //! use v_frame::chroma::ChromaSubsampling;
-//! use std::num::{NonZeroU8, NonZeroUsize};
 //!
 //! let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 10)
 //! .luma_padding_left(16)
@@ -156,7 +154,6 @@ impl<T: Pixel> Frame<T> {
 /// ```rust
 /// use v_frame::frame::FrameBuilder;
 /// use v_frame::chroma::ChromaSubsampling;
-/// use std::num::{NonZeroU8, NonZeroUsize};
 ///
 /// let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
 /// .luma_padding_left(8)
