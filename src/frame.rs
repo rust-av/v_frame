@@ -31,7 +31,7 @@
 //! - Use `Frame<u16>` for high bit-depth (9-16 bit) video
 //!
 //! The builder validates that the pixel type matches the specified bit depth,
-//! returning [`Error::DataTypeMismatch`] if they don't align.
+//! returning [`FrameError::DataTypeMismatch`] if they don't align.
 //!
 //! # Padding
 //!
@@ -75,6 +75,9 @@
 //! .build::<u16>().unwrap();
 //! ```
 
+mod error;
+pub use error::FrameError;
+
 #[cfg(test)]
 mod tests;
 
@@ -82,7 +85,6 @@ use std::num::NonZeroU8;
 
 use crate::{
     chroma::ChromaSubsampling,
-    error::Error,
     pixel::Pixel,
     plane::{Plane, PlaneGeometry},
 };
@@ -232,13 +234,14 @@ impl FrameBuilder {
     /// Constructs a `Frame` from the current builder.
     ///
     /// # Errors
-    /// - Returns `Error::UnsupportedBitDepth` if the input bit depth is unsupported
+    /// - Returns `FrameError::UnsupportedBitDepth` if the input bit depth is unsupported
     ///   (currently 8-16 bit inputs are supported)
-    /// - Returns `Error::DataTypeMismatch` if the size of `T` does not match the input bit depth
-    /// - Returns `Error::UnsupportedResolution` if the resolution or padding dimensions
+    /// - Returns `FrameError::DataTypeMismatch` if the size of `T` does not match the
+    ///   input bit depth
+    /// - Returns `FrameError::UnsupportedResolution` if the resolution or padding dimensions
     ///   do not support the requested subsampling
     #[inline]
-    pub fn build<T: Pixel>(self) -> Result<Frame<T>, Error> {
+    pub fn build<T: Pixel>(self) -> Result<Frame<T>, FrameError> {
         let byte_width = const {
             let sz = size_of::<T>();
             assert!(sz > 0 && sz <= 2, "T must have a size of 1 or 2 bytes");
@@ -246,13 +249,13 @@ impl FrameBuilder {
         };
 
         if self.bit_depth < 8 || self.bit_depth > 16 {
-            return Err(Error::UnsupportedBitDepth {
+            return Err(FrameError::UnsupportedBitDepth {
                 found: self.bit_depth,
             });
         }
 
         if (byte_width == 1 && self.bit_depth != 8) || (byte_width == 2 && self.bit_depth <= 8) {
-            return Err(Error::DataTypeMismatch);
+            return Err(FrameError::DataTypeMismatch);
         }
 
         let Some(luma_geometry) = PlaneGeometry::new(
@@ -265,13 +268,13 @@ impl FrameBuilder {
             1,
             1,
         ) else {
-            return Err(Error::UnsupportedResolution);
+            return Err(FrameError::UnsupportedResolution);
         };
 
         let (u_plane, v_plane) = match luma_geometry.for_subsampling(self.subsampling) {
             Ok(Some(g)) => (Some(Plane::new(g)), Some(Plane::new(g))),
             Ok(None) => (None, None),
-            Err(_) => return Err(Error::UnsupportedResolution),
+            Err(_) => return Err(FrameError::UnsupportedResolution),
         };
 
         Ok(Frame {
@@ -280,7 +283,7 @@ impl FrameBuilder {
             v_plane,
             subsampling: self.subsampling,
             bit_depth: NonZeroU8::new(self.bit_depth)
-                .ok_or(Error::UnsupportedBitDepth { found: 0 })?,
+                .ok_or(FrameError::UnsupportedBitDepth { found: 0 })?,
         })
     }
 }

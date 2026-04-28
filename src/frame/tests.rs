@@ -140,7 +140,7 @@ fn unsupported_bit_depth_too_low() {
 
     assert!(matches!(
         result,
-        Err(Error::UnsupportedBitDepth { found: 7 })
+        Err(FrameError::UnsupportedBitDepth { found: 7 })
     ));
 }
 
@@ -150,7 +150,7 @@ fn unsupported_bit_depth_too_high() {
 
     assert!(matches!(
         result,
-        Err(Error::UnsupportedBitDepth { found: 17 })
+        Err(FrameError::UnsupportedBitDepth { found: 17 })
     ));
     assert!(
         format!("{}", result.err().unwrap()).starts_with("only 8-16 bit frame data is supported,")
@@ -161,7 +161,7 @@ fn unsupported_bit_depth_too_high() {
 fn data_type_mismatch_u8_with_10bit() {
     let result = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 10).build::<u8>();
 
-    assert!(matches!(result, Err(Error::DataTypeMismatch)));
+    assert!(matches!(result, Err(FrameError::DataTypeMismatch)));
     assert!(format!("{}", result.err().unwrap()).starts_with("bit depth did not match"));
 }
 
@@ -169,14 +169,14 @@ fn data_type_mismatch_u8_with_10bit() {
 fn data_type_mismatch_u16_with_8bit() {
     let result = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8).build::<u16>();
 
-    assert!(matches!(result, Err(Error::DataTypeMismatch)));
+    assert!(matches!(result, Err(FrameError::DataTypeMismatch)));
 }
 
 #[test]
 fn yuv420_odd_width_resolution_error() {
     let result = FrameBuilder::new(1921, 1080, ChromaSubsampling::Yuv420, 8).build::<u8>();
 
-    assert!(matches!(result, Err(Error::UnsupportedResolution)));
+    assert!(matches!(result, Err(FrameError::UnsupportedResolution)));
     assert!(
         format!("{}", result.err().unwrap())
             .starts_with("selected chroma subsampling does not support")
@@ -187,14 +187,14 @@ fn yuv420_odd_width_resolution_error() {
 fn yuv420_odd_height_resolution_error() {
     let result = FrameBuilder::new(1920, 1081, ChromaSubsampling::Yuv420, 8).build::<u8>();
 
-    assert!(matches!(result, Err(Error::UnsupportedResolution)));
+    assert!(matches!(result, Err(FrameError::UnsupportedResolution)));
 }
 
 #[test]
 fn yuv422_odd_width_resolution_error() {
     let result = FrameBuilder::new(1921, 1080, ChromaSubsampling::Yuv422, 8).build::<u8>();
 
-    assert!(matches!(result, Err(Error::UnsupportedResolution)));
+    assert!(matches!(result, Err(FrameError::UnsupportedResolution)));
 }
 
 #[test]
@@ -235,7 +235,7 @@ fn padding_not_aligned_to_subsampling_yuv420() {
         .luma_padding_left(15)
         .build::<u8>();
 
-    assert!(matches!(result, Err(Error::UnsupportedResolution)));
+    assert!(matches!(result, Err(FrameError::UnsupportedResolution)));
 }
 
 #[test]
@@ -245,7 +245,7 @@ fn padding_not_aligned_to_subsampling_yuv422() {
         .luma_padding_left(15)
         .build::<u8>();
 
-    assert!(matches!(result, Err(Error::UnsupportedResolution)));
+    assert!(matches!(result, Err(FrameError::UnsupportedResolution)));
 }
 
 #[test]

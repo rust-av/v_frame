@@ -48,7 +48,7 @@ mod private {
 /// - Frames with 9-16 bit depth can only be created with `T = u16`
 ///
 /// Attempting to create a frame with a mismatched type will result in
-/// [`Error::DataTypeMismatch`](crate::error::Error::DataTypeMismatch).
+/// [`FrameError::DataTypeMismatch`][crate::frame::FrameError::DataTypeMismatch].
 ///
 /// # Safety
 ///

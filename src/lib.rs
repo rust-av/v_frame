@@ -34,7 +34,6 @@
 //! ```
 
 pub mod chroma;
-pub mod error;
 pub mod frame;
 pub mod pixel;
 pub mod plane;

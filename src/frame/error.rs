@@ -7,21 +7,13 @@
 // Media Patent License 1.0 was not distributed with this source code in the
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
-//! Error types for the `v_frame` crate.
-//!
-//! This module defines the error types used throughout the `v_frame` crate for
-//! handling various error conditions related to frame processing, data validation,
-//! and format compatibility.
-
 use std::fmt;
 
-/// The error type for `v_frame` operations.
-///
 /// This enum represents all possible error conditions that can occur during
-/// frame processing, including data validation errors, unsupported formats,
+/// frame creation, including data validation errors, unsupported formats,
 /// and configuration mismatches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Error {
+pub enum FrameError {
     /// Returned when attempting to create a frame with an unsupported bit depth.
     ///
     /// The library only supports bit depths from 8 to 16 bits inclusive.
@@ -41,19 +33,18 @@ pub enum Error {
     UnsupportedResolution,
 }
 
-impl fmt::Display for Error {
-    #[expect(
-        clippy::missing_inline_in_public_items,
-        reason = "string formatting often generates big code"
-    )]
+impl fmt::Display for FrameError {
+    #[expect(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::UnsupportedBitDepth { found } => write!(
+            Self::UnsupportedBitDepth { found } => write!(
                 f,
                 "only 8-16 bit frame data is supported, tried to create {found} bit frame"
             ),
-            Error::DataTypeMismatch => write!(f, "bit depth did not match requested data type"),
-            Error::UnsupportedResolution => write!(
+            Self::DataTypeMismatch => {
+                write!(f, "bit depth did not match requested data type")
+            }
+            Self::UnsupportedResolution => write!(
                 f,
                 "selected chroma subsampling does not support odd resolutions"
             ),
@@ -61,4 +52,4 @@ impl fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for FrameError {}
