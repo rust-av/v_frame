@@ -30,6 +30,9 @@
 //! To ensure safety, planes must be instantiated by building a [`Frame`](crate::frame::Frame)
 //! through the [`FrameBuilder`](crate::frame::FrameBuilder) interface.
 
+mod error;
+pub use error::CopyError;
+
 #[cfg(test)]
 mod tests;
 
@@ -43,7 +46,7 @@ use aligned::AlignedData;
 mod geometry;
 pub use geometry::PlaneGeometry;
 
-use crate::{error::Error, pixel::Pixel};
+use crate::pixel::Pixel;
 
 /// A two-dimensional plane of pixel data with optional padding.
 ///
@@ -334,14 +337,14 @@ impl<T: Pixel> Plane<T> {
     /// Copies the data from `src` into this plane's visible pixels.
     ///
     /// # Errors
-    /// - Returns `Error::Datalength` if the length of `src` does not match
+    /// - Returns `CopyError::DataLength` if the length of `src` does not match
     ///   this plane's `width * height`
     #[inline]
-    pub fn copy_from_slice(&mut self, src: &[T]) -> Result<(), Error> {
+    pub fn copy_from_slice(&mut self, src: &[T]) -> Result<(), CopyError> {
         let width = self.width().get();
         let pixel_count = width * self.height().get();
         if pixel_count != src.len() {
-            return Err(Error::DataLength {
+            return Err(CopyError::DataLength {
                 expected: pixel_count,
                 found: src.len(),
             });
@@ -362,10 +365,10 @@ impl<T: Pixel> Plane<T> {
     /// this is equivalent to `copy_from_slice`.
     ///
     /// # Errors
-    /// - Returns `Error::Datalength` if the length of `src` does not match
+    /// - Returns `CopyError::DataLength` if the length of `src` does not match
     ///   this plane's `width * height * bytes_per_pixel`
     #[inline]
-    pub fn copy_from_u8_slice(&mut self, src: &[u8]) -> Result<(), Error> {
+    pub fn copy_from_u8_slice(&mut self, src: &[u8]) -> Result<(), CopyError> {
         self.copy_from_u8_slice_with_stride(src, self.width().get() * size_of::<T>())
     }
 
@@ -374,15 +377,15 @@ impl<T: Pixel> Plane<T> {
     /// The `input_stride` must be in bytes.
     ///
     /// # Errors
-    /// - Returns `Error::Datalength` if the length of `src` does not match
+    /// - Returns `CopyError::DataLength` if the length of `src` does not match
     ///   this plane's `width * height * bytes_per_pixel`
-    /// - Returns `Error::InvalidStride` if the stride is shorter than the visible width
+    /// - Returns `CopyError::InvalidStride` if the stride is shorter than the visible width
     #[inline]
     pub fn copy_from_u8_slice_with_stride(
         &mut self,
         src: &[u8],
         stride: usize,
-    ) -> Result<(), Error> {
+    ) -> Result<(), CopyError> {
         let byte_width = size_of::<T>();
         assert!(
             byte_width <= 2,
@@ -390,7 +393,7 @@ impl<T: Pixel> Plane<T> {
         );
 
         if stride < self.width().get() {
-            return Err(Error::InvalidStride {
+            return Err(CopyError::InvalidStride {
                 stride,
                 width: self.width().get(),
             });
@@ -398,7 +401,7 @@ impl<T: Pixel> Plane<T> {
 
         let byte_count = stride * self.height().get();
         if byte_count != src.len() {
-            return Err(Error::DataLength {
+            return Err(CopyError::DataLength {
                 expected: byte_count,
                 found: src.len(),
             });

@@ -22,17 +22,6 @@ use std::fmt;
 /// and configuration mismatches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Error {
-    /// Returned when the provided data buffer size does not match the expected size.
-    ///
-    /// This typically occurs when constructing a plane or frame from raw data with
-    /// incorrect dimensions.
-    DataLength {
-        /// The expected data length based on the provided dimensions
-        expected: usize,
-        /// The actual length of the provided data array
-        found: usize,
-    },
-
     /// Returned when attempting to create a frame with an unsupported bit depth.
     ///
     /// The library only supports bit depths from 8 to 16 bits inclusive.
@@ -50,16 +39,6 @@ pub enum Error {
     ///
     /// For example, YUV420 requires even width and height, while YUV422 requires even width.
     UnsupportedResolution,
-
-    /// Returned when a plane's stride is smaller than its visible width.
-    ///
-    /// The stride must be at least as large as the width to accommodate each row of pixels.
-    InvalidStride {
-        /// The stride which triggered the error
-        stride: usize,
-        /// The visible width of the plane
-        width: usize,
-    },
 }
 
 impl fmt::Display for Error {
@@ -69,10 +48,6 @@ impl fmt::Display for Error {
     )]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::DataLength { expected, found } => write!(
-                f,
-                "data length mismatch, expected {expected}, found {found}"
-            ),
             Error::UnsupportedBitDepth { found } => write!(
                 f,
                 "only 8-16 bit frame data is supported, tried to create {found} bit frame"
@@ -81,10 +56,6 @@ impl fmt::Display for Error {
             Error::UnsupportedResolution => write!(
                 f,
                 "selected chroma subsampling does not support odd resolutions"
-            ),
-            Error::InvalidStride { stride, width } => write!(
-                f,
-                "provided stride {stride} was less than the visible width {width}"
             ),
         }
     }
