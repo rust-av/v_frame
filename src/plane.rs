@@ -41,7 +41,7 @@ mod aligned;
 use aligned::AlignedData;
 
 mod geometry;
-pub use geometry::PlaneGeometry;
+pub use geometry::{PlaneGeometry, SubsamplingError};
 
 use crate::{error::Error, pixel::Pixel};
 
