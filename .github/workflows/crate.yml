@@ -58,19 +58,25 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        features: ["", "padding_api"]
+        # TODO: wasm32-unknown-unknown (might need another tool that's not wasmtime)
+        target: ["wasm32-wasip1", "wasm32-wasip2", "wasm32-wasip3"]
+        feature: ["", "--features padding_api"]
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown
+          targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
-      - name: Install wasm-pack
+      - name: Install wasmtime
         uses: taiki-e/install-action@v2
         with:
-          tool: wasm-pack
-      - name: Run WASM tests${{ matrix.features && format(' ({0})', matrix.features) || '' }}
-        run: wasm-pack test --headless --chrome --firefox ${{ matrix.features && format('--features {0}', matrix.features) || '' }}
+          tool: wasmtime
+      - name: Build tests
+        run: cargo build --tests --target ${{ matrix.target }} ${{ matrix.feature }}
+      - name: Run tests
+        run: |
+          FILE=$(find target/${{ matrix.target }} -type f -name 'v_frame*.wasm')
+          wasmtime run "$FILE"
 
   # Disabling miri for now since it seems to be really, really slow
   # We should run it manually instead of on every CI run
