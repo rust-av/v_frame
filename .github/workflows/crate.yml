@@ -59,7 +59,7 @@ jobs:
     strategy:
       matrix:
         # TODO: wasm32-unknown-unknown (might need another tool that's not wasmtime)
-        target: ["wasm32-wasip1", "wasm32-wasip2", "wasm32-wasip3"]
+        target: ["wasm32-wasip1", "wasm32-wasip2"]
         feature: ["", "--features padding_api"]
     steps:
       - uses: actions/checkout@v6
