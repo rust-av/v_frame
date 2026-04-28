@@ -135,6 +135,15 @@ fn monochrome_no_chroma_planes() {
 }
 
 #[test]
+fn unsupported_resolution_zero_width_height() {
+    let result = FrameBuilder::new(0, 1080, ChromaSubsampling::Yuv420, 8).build::<u8>();
+    assert_eq!(result, Err(FrameError::UnsupportedResolution));
+
+    let result = FrameBuilder::new(1920, 0, ChromaSubsampling::Yuv422, 8).build::<u8>();
+    assert_eq!(result, Err(FrameError::UnsupportedResolution));
+}
+
+#[test]
 fn unsupported_bit_depth_too_low() {
     let result = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 7).build::<u8>();
 
