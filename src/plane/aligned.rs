@@ -8,13 +8,17 @@ use std::ptr::NonNull;
 
 use crate::pixel::Pixel;
 
-/// Alignment for plane data on WASM platforms (8 bytes).
-#[cfg(target_arch = "wasm32")]
-const DATA_ALIGNMENT: usize = 1 << 3;
-
-/// Alignment for plane data on non-WASM platforms (64 bytes for SIMD optimization).
-#[cfg(not(target_arch = "wasm32"))]
-const DATA_ALIGNMENT: usize = 1 << 6;
+// Minimum data alignment to help with SIMD
+const DATA_ALIGNMENT: usize = {
+    if cfg!(target_arch = "wasm32") && cfg!(not(target_os = "wasi")) {
+        // wasm32-unknown-unknown, wasm32-unknown-emscripten
+        // these targets may have problems allocating with alignments > 8 bytes
+        8
+    } else {
+        // Others (x86, arm, wasm32-wasip1)
+        64
+    }
+};
 
 pub struct AlignedData<T> {
     ptr: NonNull<[T]>,
