@@ -3,6 +3,7 @@ name = "v_frame"
 version = "0.5.2"
 rust-version = "1.85.0"
 description = "Video Frame data structures, originally part of rav1e"
+categories = ["multimedia::video"]
 license = "BSD-2-Clause"
 edition = "2024"
 repository = "https://github.com/rust-av/v_frame"
