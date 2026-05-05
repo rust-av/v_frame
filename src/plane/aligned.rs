@@ -219,6 +219,25 @@ mod tests {
         AlignedData::<String>::new_uninit(0);
     }
 
+    #[cfg(miri)]
+    #[test]
+    fn new_uninit_underaligns_overaligned_types() {
+        #[allow(dead_code)]
+        #[repr(align(1048576))]
+        struct OverAligned([u8; 1]);
+
+        // Issue: `AlignedData::new_uninit` allocates with `DATA_ALIGNMENT`
+        // rather than `max(DATA_ALIGNMENT, align_of::<T>())`. Safe callers can
+        // therefore create `AlignedData<MaybeUninit<T>>` for an over-aligned
+        // `T`, and the safe slice accessors form references whose required
+        // alignment is stronger than the allocation's layout. The public
+        // `Plane::new_uninit` padding API forwards to this helper for arbitrary
+        // `T`, so this can be reached without an unsafe call before any
+        // `assume_init`.
+        let mut data = AlignedData::<OverAligned>::new_uninit(1);
+        data[0].write(OverAligned([0]));
+    }
+
     #[test]
     #[should_panic(expected = "invalid layout")]
     fn invalid_layout_panic() {

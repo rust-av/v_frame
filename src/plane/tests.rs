@@ -59,6 +59,24 @@ fn plane_new_u16() {
     }
 }
 
+#[cfg(miri)]
+#[test]
+fn mutable_geometry_fields_can_break_row_slice_invariant() {
+    let mut geometry = simple_geometry(1, 1);
+    geometry.pad_left = 1;
+
+    // Issue: `Plane::rows` and `Plane::rows_mut` use `get_unchecked` under the
+    // invariant that `pad_left + width <= stride`. `PlaneGeometry::new` creates
+    // values satisfying that invariant, but the fields are public and can be
+    // mutated afterwards. A safe constructor that trusts such a geometry can
+    // then build a plane where safe row iteration creates an out-of-bounds
+    // slice. With the `padding_api` feature, external safe code can supply a
+    // mutated geometry to `Plane::new_uninit`; this crate-local constructor
+    // demonstrates the same trusted invariant without needing unsafe setup.
+    let plane: Plane<u8> = Plane::new(geometry);
+    let _ = plane.rows().next();
+}
+
 #[test]
 fn plane_dimensions() {
     let geometry = simple_geometry(16, 9);
