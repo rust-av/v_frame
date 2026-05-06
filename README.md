@@ -14,7 +14,8 @@ A Rust library providing efficient data structures and utilities for handling YU
 - **Flexible plane structure**: Efficient memory layout with configurable padding for SIMD operations
 - **Multiple chroma formats**: Support for YUV 4:2:0, 4:2:2, 4:4:4, and monochrome
 - **Builder pattern API**: Safe and ergonomic frame construction with compile-time guarantees
-- **SIMD-friendly alignment**: 64-byte alignment (8-byte on WASM) for optimal performance
+- **SIMD-friendly alignment**: non-empty planes are aligned to at least 64 bytes
+  on most targets, 8 bytes on non-WASI `wasm32`, or `align_of::<T>()` if larger
 - **WebAssembly support**: Works in both browser (`wasm32-unknown-unknown`) and WASI environments
 - **Zero-copy iterators**: Efficient row-based and pixel-based iteration without allocations
 
@@ -158,7 +159,10 @@ cargo build --target wasm32-wasi
 wasm-pack test --headless --chrome --firefox
 ```
 
-The crate automatically adjusts memory alignment for WASM targets (8-byte vs 64-byte on native).
+The crate automatically adjusts memory alignment for WebAssembly: non-WASI
+`wasm32` targets use an 8-byte minimum alignment, while WASI and native targets
+use a 64-byte minimum. Over-aligned pixel data uses `align_of::<T>()` if that is
+larger.
 
 ## Feature Flags
 

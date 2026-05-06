@@ -1,14 +1,15 @@
 use std::alloc::{Layout, alloc, alloc_zeroed, dealloc, handle_alloc_error};
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::mem::{ManuallyDrop, MaybeUninit};
+use std::mem::{ManuallyDrop, MaybeUninit, align_of};
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
 
 use crate::pixel::Pixel;
 
-// Minimum data alignment to help with SIMD
+// Minimum data alignment to help with SIMD. Non-empty allocations use this or
+// `align_of::<T>()`, whichever is larger.
 const DATA_ALIGNMENT: usize = {
     if cfg!(target_arch = "wasm32") && cfg!(not(target_os = "wasi")) {
         // wasm32-unknown-unknown, wasm32-unknown-emscripten
@@ -34,13 +35,18 @@ unsafe impl<T: Sync> Sync for AlignedData<T> {}
 impl<T> AlignedData<T> {
     const fn layout(len: NonZeroUsize) -> Layout {
         const { assert!(DATA_ALIGNMENT.is_power_of_two()) };
+        let alignment = if align_of::<T>() > DATA_ALIGNMENT {
+            align_of::<T>()
+        } else {
+            DATA_ALIGNMENT
+        };
         let t_size = const { NonZeroUsize::new(size_of::<T>()).expect("T is Sized") };
 
         let size = len
             .checked_mul(t_size)
             .expect("allocation size does not overflow usize");
 
-        match Layout::from_size_align(size.get(), DATA_ALIGNMENT) {
+        match Layout::from_size_align(size.get(), alignment) {
             Ok(l) => l,
             _ => panic!("invalid layout"),
         }

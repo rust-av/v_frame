@@ -92,6 +92,29 @@ impl PlaneGeometry {
         Self::new(width, height, 0, 0, 0, 0, subsampling_x, subsampling_y)
     }
 
+    #[inline]
+    pub(crate) fn normalized(self) -> Option<Self> {
+        Self::new(
+            self.width.get(),
+            self.height.get(),
+            self.pad_left,
+            self.pad_right,
+            self.pad_top,
+            self.pad_bottom,
+            self.subsampling_x.get(),
+            self.subsampling_y.get(),
+        )
+    }
+
+    #[inline]
+    pub(crate) fn allocation_len(self) -> Option<usize> {
+        self.height
+            .get()
+            .checked_add(self.pad_top)?
+            .checked_add(self.pad_bottom)?
+            .checked_mul(self.stride.get())
+    }
+
     /// Returns a new [`PlaneGeometry`] based on `self` and according to `subsampling`.
     ///
     /// Returns:

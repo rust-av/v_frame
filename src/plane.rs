@@ -138,11 +138,15 @@ impl<T> Plane<T> {
     #[inline]
     #[must_use]
     pub fn new_uninit(geometry: PlaneGeometry) -> Plane<MaybeUninit<T>> {
-        let rows = geometry.alloc_height();
-        let pixels = rows.saturating_mul(geometry.stride);
+        let geometry = geometry
+            .normalized()
+            .expect("plane geometry dimensions must not overflow");
+        let pixels = geometry
+            .allocation_len()
+            .expect("plane allocation size must not overflow usize");
 
         Plane {
-            data: AlignedData::new_uninit(pixels.get()),
+            data: AlignedData::new_uninit(pixels),
             geometry,
         }
     }
@@ -198,8 +202,12 @@ impl<T> Plane<MaybeUninit<T>> {
 impl<T: Pixel> Plane<T> {
     /// Creates a new plane with the given geometry, initialized with zero-valued pixels.
     pub(crate) fn new(geometry: PlaneGeometry) -> Self {
-        let rows = geometry.alloc_height();
-        let pixels = rows.get() * geometry.stride.get();
+        let geometry = geometry
+            .normalized()
+            .expect("plane geometry dimensions must not overflow");
+        let pixels = geometry
+            .allocation_len()
+            .expect("plane allocation size must not overflow usize");
 
         Self {
             data: AlignedData::new(pixels),
