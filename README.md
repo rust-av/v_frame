@@ -169,7 +169,7 @@ larger.
 
 ## Requirements
 
-- Rust 1.85.0 or later
+- Rust 1.95.0 or later
 - For WebAssembly: `wasm-bindgen` is automatically included for `wasm32-unknown-unknown` target
 
 ## Documentation
