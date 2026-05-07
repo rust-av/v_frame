@@ -98,7 +98,7 @@ impl ChromaSubsampling {
         let ss_y = subsample.1.get() as usize;
 
         // Check if the division is exact (no remainder)
-        (luma_width % ss_x == 0 && luma_height % ss_y == 0)
+        (luma_width.is_multiple_of(ss_x) && luma_height.is_multiple_of(ss_y))
             .then(|| (luma_width / ss_x, luma_height / ss_y))
     }
 
