@@ -247,15 +247,15 @@ mod tests {
         assert!(PlaneGeometry::unpadded(1920, 1080, 1, 0).is_none());
 
         let g = PlaneGeometry::unpadded(1920, 1080, 1, 1).expect("unpadded geometry works");
-        assert_eq!(g.width.get(), 1920);
-        assert_eq!(g.height.get(), 1080);
+        assert_eq!(g.width(), 1920);
+        assert_eq!(g.height(), 1080);
         assert_eq!(g.stride, g.width);
-        assert_eq!(g.pad_left, 0);
-        assert_eq!(g.pad_right, 0);
-        assert_eq!(g.pad_top, 0);
-        assert_eq!(g.pad_bottom, 0);
-        assert_eq!(g.subsampling_x.get(), 1);
-        assert_eq!(g.subsampling_y.get(), 1);
+        assert_eq!(g.pad_left(), 0);
+        assert_eq!(g.pad_right(), 0);
+        assert_eq!(g.pad_top(), 0);
+        assert_eq!(g.pad_bottom(), 0);
+        assert_eq!(g.subsampling_x(), 1);
+        assert_eq!(g.subsampling_y(), 1);
     }
 
     #[test]
@@ -266,15 +266,15 @@ mod tests {
         assert!(PlaneGeometry::new(1920, 1080, 40, 30, 20, 10, 1, 0).is_none());
 
         let g = PlaneGeometry::new(1920, 1080, 40, 30, 20, 10, 1, 1).expect("new geometry works");
-        assert_eq!(g.width.get(), 1920);
-        assert_eq!(g.height.get(), 1080);
-        assert_eq!(g.stride.get(), 1920 + 40 + 30);
-        assert_eq!(g.pad_left, 40);
-        assert_eq!(g.pad_right, 30);
-        assert_eq!(g.pad_top, 20);
-        assert_eq!(g.pad_bottom, 10);
-        assert_eq!(g.subsampling_x.get(), 1);
-        assert_eq!(g.subsampling_y.get(), 1);
+        assert_eq!(g.width(), 1920);
+        assert_eq!(g.height(), 1080);
+        assert_eq!(g.stride(), 1920 + 40 + 30);
+        assert_eq!(g.pad_left(), 40);
+        assert_eq!(g.pad_right(), 30);
+        assert_eq!(g.pad_top(), 20);
+        assert_eq!(g.pad_bottom(), 10);
+        assert_eq!(g.subsampling_x(), 1);
+        assert_eq!(g.subsampling_y(), 1);
     }
 
     #[test]
@@ -299,29 +299,29 @@ mod tests {
             .for_subsampling(ChromaSubsampling::Yuv422)
             .expect("can subsample to Yuv422")
             .expect("subsampled plane exists for Yuv422");
-        assert_eq!(sub.width.get(), 960);
-        assert_eq!(sub.height.get(), 1080);
-        assert_eq!(sub.stride.get(), 960 + 20 + 15);
-        assert_eq!(sub.pad_left, 20);
-        assert_eq!(sub.pad_right, 15);
-        assert_eq!(sub.pad_top, 20);
-        assert_eq!(sub.pad_bottom, 10);
-        assert_eq!(sub.subsampling_x.get(), 2);
-        assert_eq!(sub.subsampling_y.get(), 1);
+        assert_eq!(sub.width(), 960);
+        assert_eq!(sub.height(), 1080);
+        assert_eq!(sub.stride(), 960 + 20 + 15);
+        assert_eq!(sub.pad_left(), 20);
+        assert_eq!(sub.pad_right(), 15);
+        assert_eq!(sub.pad_top(), 20);
+        assert_eq!(sub.pad_bottom(), 10);
+        assert_eq!(sub.subsampling_x(), 2);
+        assert_eq!(sub.subsampling_y(), 1);
 
         let sub = g
             .for_subsampling(ChromaSubsampling::Yuv420)
             .expect("can subsample to Yuv420")
             .expect("subsampled plane exists for Yuv420");
-        assert_eq!(sub.width.get(), 960);
-        assert_eq!(sub.height.get(), 540);
-        assert_eq!(sub.stride.get(), 960 + 20 + 15);
+        assert_eq!(sub.width(), 960);
+        assert_eq!(sub.height(), 540);
+        assert_eq!(sub.stride(), 960 + 20 + 15);
         assert_eq!(sub.pad_left, 20);
         assert_eq!(sub.pad_right, 15);
         assert_eq!(sub.pad_top, 10);
         assert_eq!(sub.pad_bottom, 5);
-        assert_eq!(sub.subsampling_x.get(), 2);
-        assert_eq!(sub.subsampling_y.get(), 2);
+        assert_eq!(sub.subsampling_x(), 2);
+        assert_eq!(sub.subsampling_y(), 2);
     }
 
     #[test]
