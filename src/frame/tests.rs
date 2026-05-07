@@ -56,8 +56,8 @@ fn basic_8bit_frame() {
         .build::<u8>()
         .unwrap();
 
-    assert_eq!(frame.y_plane.width().get(), 1920);
-    assert_eq!(frame.y_plane.height().get(), 1080);
+    assert_eq!(frame.y_plane.width(), 1920);
+    assert_eq!(frame.y_plane.height(), 1080);
     assert_eq!(frame.bit_depth.get(), 8);
     assert_eq!(frame.subsampling, ChromaSubsampling::Yuv420);
 }
@@ -68,8 +68,8 @@ fn basic_10bit_frame() {
         .build::<u16>()
         .unwrap();
 
-    assert_eq!(frame.y_plane.width().get(), 3840);
-    assert_eq!(frame.y_plane.height().get(), 2160);
+    assert_eq!(frame.y_plane.width(), 3840);
+    assert_eq!(frame.y_plane.height(), 2160);
     assert_eq!(frame.bit_depth.get(), 10);
 }
 
@@ -83,10 +83,10 @@ fn yuv420_chroma_dimensions() {
     let v_plane = frame.v_plane.as_ref().unwrap();
 
     // YUV420 has chroma planes at half width and half height
-    assert_eq!(u_plane.width().get(), 960);
-    assert_eq!(u_plane.height().get(), 540);
-    assert_eq!(v_plane.width().get(), 960);
-    assert_eq!(v_plane.height().get(), 540);
+    assert_eq!(u_plane.width(), 960);
+    assert_eq!(u_plane.height(), 540);
+    assert_eq!(v_plane.width(), 960);
+    assert_eq!(v_plane.height(), 540);
 }
 
 #[test]
@@ -99,10 +99,10 @@ fn yuv422_chroma_dimensions() {
     let v_plane = frame.v_plane.as_ref().unwrap();
 
     // YUV422 has chroma planes at half width and full height
-    assert_eq!(u_plane.width().get(), 960);
-    assert_eq!(u_plane.height().get(), 1080);
-    assert_eq!(v_plane.width().get(), 960);
-    assert_eq!(v_plane.height().get(), 1080);
+    assert_eq!(u_plane.width(), 960);
+    assert_eq!(u_plane.height(), 1080);
+    assert_eq!(v_plane.width(), 960);
+    assert_eq!(v_plane.height(), 1080);
 }
 
 #[test]
@@ -115,10 +115,10 @@ fn yuv444_chroma_dimensions() {
     let v_plane = frame.v_plane.as_ref().unwrap();
 
     // YUV444 has chroma planes at full resolution
-    assert_eq!(u_plane.width().get(), 1920);
-    assert_eq!(u_plane.height().get(), 1080);
-    assert_eq!(v_plane.width().get(), 1920);
-    assert_eq!(v_plane.height().get(), 1080);
+    assert_eq!(u_plane.width(), 1920);
+    assert_eq!(u_plane.height(), 1080);
+    assert_eq!(v_plane.width(), 1920);
+    assert_eq!(v_plane.height(), 1080);
 }
 
 #[test]
@@ -127,8 +127,8 @@ fn monochrome_no_chroma_planes() {
         .build::<u8>()
         .unwrap();
 
-    assert_eq!(frame.y_plane.width().get(), 1920);
-    assert_eq!(frame.y_plane.height().get(), 1080);
+    assert_eq!(frame.y_plane.width(), 1920);
+    assert_eq!(frame.y_plane.height(), 1080);
     assert!(frame.u_plane.is_none());
     assert!(frame.v_plane.is_none());
     assert_eq!(frame.subsampling, ChromaSubsampling::Monochrome);
@@ -217,8 +217,8 @@ fn frame_with_luma_padding() {
         .unwrap();
 
     // Visible dimensions should remain unchanged
-    assert_eq!(frame.y_plane.width().get(), 1920);
-    assert_eq!(frame.y_plane.height().get(), 1080);
+    assert_eq!(frame.y_plane.width(), 1920);
+    assert_eq!(frame.y_plane.height(), 1080);
 }
 
 #[test]
@@ -233,8 +233,8 @@ fn chroma_padding_derived_from_luma_yuv420() {
 
     // For YUV420, chroma padding should be half of luma padding
     let u_plane = frame.u_plane.as_ref().unwrap();
-    assert_eq!(u_plane.width().get(), 960); // chroma width
-    assert_eq!(u_plane.height().get(), 540); // chroma height
+    assert_eq!(u_plane.width(), 960); // chroma width
+    assert_eq!(u_plane.height(), 540); // chroma height
 }
 
 #[test]
@@ -321,12 +321,12 @@ fn small_resolution() {
         .build::<u8>()
         .unwrap();
 
-    assert_eq!(frame.y_plane.width().get(), 2);
-    assert_eq!(frame.y_plane.height().get(), 2);
+    assert_eq!(frame.y_plane.width(), 2);
+    assert_eq!(frame.y_plane.height(), 2);
 
     let u_plane = frame.u_plane.as_ref().unwrap();
-    assert_eq!(u_plane.width().get(), 1);
-    assert_eq!(u_plane.height().get(), 1);
+    assert_eq!(u_plane.width(), 1);
+    assert_eq!(u_plane.height(), 1);
 }
 
 #[test]
@@ -338,7 +338,7 @@ fn builder_setters() {
         .luma_padding_bottom(8)
         .build::<u8>()
         .unwrap();
-    assert!(frame.y_plane.width().get() == 1920);
+    assert!(frame.y_plane.width() == 1920);
 }
 
 #[test]
@@ -352,6 +352,6 @@ fn asymmetric_padding() {
         .unwrap();
 
     // Visible dimensions should remain unchanged
-    assert_eq!(frame.y_plane.width().get(), 1920);
-    assert_eq!(frame.y_plane.height().get(), 1080);
+    assert_eq!(frame.y_plane.width(), 1920);
+    assert_eq!(frame.y_plane.height(), 1080);
 }

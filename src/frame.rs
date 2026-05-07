@@ -52,13 +52,13 @@
 //!     .unwrap();
 //!
 //! // Access the planes
-//! assert_eq!(frame.y_plane.width().get(), 1920);
-//! assert_eq!(frame.y_plane.height().get(), 1080);
+//! assert_eq!(frame.y_plane.width(), 1920);
+//! assert_eq!(frame.y_plane.height(), 1080);
 //!
 //! // Chroma planes are half size for YUV420
 //! let u_plane = frame.u_plane.as_ref().unwrap();
-//! assert_eq!(u_plane.width().get(), 960);
-//! assert_eq!(u_plane.height().get(), 540);
+//! assert_eq!(u_plane.width(), 960);
+//! assert_eq!(u_plane.height(), 540);
 //! ```
 //!
 //! # Creating Frames with Padding

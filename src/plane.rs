@@ -47,7 +47,6 @@ mod tests;
 
 #[cfg(feature = "padding_api")]
 use std::mem::MaybeUninit;
-use std::num::NonZeroUsize;
 
 mod aligned;
 use aligned::AlignedData;
@@ -99,28 +98,22 @@ pub struct Plane<T> {
 }
 
 impl<T> Plane<T> {
-    /// Returns the visible width of the plane in pixels
-    #[inline]
-    #[must_use]
-    pub fn width(&self) -> NonZeroUsize {
-        self.geometry.width
-    }
-
-    /// Returns the visible height of the plane in pixels
-    #[inline]
-    #[must_use]
-    pub fn height(&self) -> NonZeroUsize {
-        self.geometry.height
-    }
-
-    /// Returns the index for the first visible pixel in `data`.
+    /// Returns the visible width of the plane in pixels.
     ///
-    /// This is a low-level API intended only for functions that require access to the padding.
+    /// Guaranteed to be non-zero.
     #[inline]
     #[must_use]
-    #[cfg_attr(not(feature = "padding_api"), doc(hidden))]
-    pub fn data_origin(&self) -> usize {
-        self.geometry.stride.get() * self.geometry.pad_top + self.geometry.pad_left
+    pub fn width(&self) -> usize {
+        self.geometry.width()
+    }
+
+    /// Returns the visible height of the plane in pixels.
+    ///
+    /// Guaranteed to be non-zero.
+    #[inline]
+    #[must_use]
+    pub fn height(&self) -> usize {
+        self.geometry.height()
     }
 }
 
@@ -168,12 +161,7 @@ impl<T> Plane<T> {
     #[inline]
     #[must_use]
     pub fn new_uninit(geometry: PlaneGeometry) -> Plane<MaybeUninit<T>> {
-        let geometry = geometry
-            .normalized()
-            .expect("plane geometry dimensions must not overflow");
-        let pixels = geometry
-            .allocation_len()
-            .expect("plane allocation size must not overflow usize");
+        let pixels = geometry.alloc_size();
 
         Plane {
             data: AlignedData::new_uninit(pixels),
@@ -232,12 +220,7 @@ impl<T> Plane<MaybeUninit<T>> {
 impl<T: Pixel> Plane<T> {
     /// Creates a new plane with the given geometry, initialized with zero-valued pixels.
     pub(crate) fn new(geometry: PlaneGeometry) -> Self {
-        let geometry = geometry
-            .normalized()
-            .expect("plane geometry dimensions must not overflow");
-        let pixels = geometry
-            .allocation_len()
-            .expect("plane allocation size must not overflow usize");
+        let pixels = geometry.alloc_size();
 
         Self {
             data: AlignedData::new(pixels),
@@ -267,12 +250,12 @@ impl<T: Pixel> Plane<T> {
     #[must_use]
     pub fn rows(&self) -> impl DoubleEndedIterator<Item = &[T]> + ExactSizeIterator {
         self.data
-            .chunks_exact(self.geometry.stride.get())
-            .skip(self.geometry.pad_top)
-            .take(self.geometry.height.get())
+            .chunks_exact(self.geometry.stride())
+            .skip(self.geometry.pad_top())
+            .take(self.geometry.height())
             .map(|row| {
-                let start_idx = self.geometry.pad_left;
-                let end_idx = start_idx + self.geometry.width.get();
+                let start_idx = self.geometry.pad_left();
+                let end_idx = start_idx + self.geometry.width();
                 // SAFETY: The plane creation interface ensures the data is large enough
                 unsafe { row.get_unchecked(start_idx..end_idx) }
             })
@@ -283,12 +266,12 @@ impl<T: Pixel> Plane<T> {
     #[inline]
     pub fn rows_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut [T]> + ExactSizeIterator {
         self.data
-            .chunks_exact_mut(self.geometry.stride.get())
-            .skip(self.geometry.pad_top)
-            .take(self.geometry.height.get())
+            .chunks_exact_mut(self.geometry.stride())
+            .skip(self.geometry.pad_top())
+            .take(self.geometry.height())
             .map(|row| {
-                let start_idx = self.geometry.pad_left;
-                let end_idx = start_idx + self.geometry.width.get();
+                let start_idx = self.geometry.pad_left();
+                let end_idx = start_idx + self.geometry.width();
                 // SAFETY: The plane creation interface ensures the data is large enough
                 unsafe { row.get_unchecked_mut(start_idx..end_idx) }
             })
@@ -302,7 +285,7 @@ impl<T: Pixel> Plane<T> {
     #[inline]
     #[must_use]
     pub fn pixel(&self, x: usize, y: usize) -> Option<T> {
-        let index = self.data_origin() + self.geometry.stride.get() * y + x;
+        let index = self.geometry.data_origin() + self.geometry.stride() * y + x;
         self.data.get(index).copied()
     }
 
@@ -313,7 +296,7 @@ impl<T: Pixel> Plane<T> {
     /// and should not be used to iterate over rows and pixels.
     #[inline]
     pub fn pixel_mut(&mut self, x: usize, y: usize) -> Option<&mut T> {
-        let index = self.data_origin() + self.geometry.stride.get() * y + x;
+        let index = self.geometry.data_origin() + self.geometry.stride() * y + x;
         self.data.get_mut(index)
     }
 
@@ -322,7 +305,7 @@ impl<T: Pixel> Plane<T> {
     #[inline]
     #[must_use]
     pub fn pixels(&self) -> impl DoubleEndedIterator<Item = T> + ExactSizeIterator {
-        let total = self.width().get() * self.height().get();
+        let total = self.width() * self.height();
         ExactSizeWrapper {
             iter: self.rows().flatten().copied(),
             len: total,
@@ -333,7 +316,7 @@ impl<T: Pixel> Plane<T> {
     /// in row-major order.
     #[inline]
     pub fn pixels_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut T> + ExactSizeIterator {
-        let total = self.width().get() * self.height().get();
+        let total = self.width() * self.height();
         ExactSizeWrapper {
             iter: self.rows_mut().flatten(),
             len: total,
@@ -352,7 +335,7 @@ impl<T: Pixel> Plane<T> {
             "unsupported pixel byte width: {byte_width}"
         );
 
-        let total = self.width().get() * self.height().get() * byte_width;
+        let total = self.width() * self.height() * byte_width;
         ExactSizeWrapper {
             iter: self.pixels().flat_map(move |pix| {
                 let bytes: [u8; 2] = if byte_width == 1 {
@@ -379,8 +362,8 @@ impl<T: Pixel> Plane<T> {
     ///   this plane's `width * height`
     #[inline]
     pub fn copy_from_slice(&mut self, src: &[T]) -> Result<(), CopyError> {
-        let width = self.width().get();
-        let pixel_count = width * self.height().get();
+        let width = self.width();
+        let pixel_count = width * self.height();
         if pixel_count != src.len() {
             return Err(CopyError::DataLength {
                 expected: pixel_count,
@@ -407,7 +390,7 @@ impl<T: Pixel> Plane<T> {
     ///   this plane's `width * height * bytes_per_pixel`
     #[inline]
     pub fn copy_from_u8_slice(&mut self, src: &[u8]) -> Result<(), CopyError> {
-        self.copy_from_u8_slice_with_stride(src, self.width().get() * size_of::<T>())
+        self.copy_from_u8_slice_with_stride(src, self.width() * size_of::<T>())
     }
 
     /// Copies the data from `src` into this plane's visible pixels.
@@ -430,14 +413,14 @@ impl<T: Pixel> Plane<T> {
             "unsupported pixel byte width: {byte_width}"
         );
 
-        if stride < self.width().get() {
+        if stride < self.width() {
             return Err(CopyError::InvalidStride {
                 stride,
-                width: self.width().get(),
+                width: self.width(),
             });
         }
 
-        let byte_count = stride * self.height().get();
+        let byte_count = stride * self.height();
         if byte_count != src.len() {
             return Err(CopyError::DataLength {
                 expected: byte_count,
@@ -445,7 +428,7 @@ impl<T: Pixel> Plane<T> {
             });
         }
 
-        let width = self.width().get();
+        let width = self.width();
         if byte_width == 1 {
             // Fast path for u8 pixels
             for (row_idx, dest_row) in self.rows_mut().enumerate() {

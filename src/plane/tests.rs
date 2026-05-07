@@ -36,8 +36,8 @@ fn plane_new_u8() {
     let geometry = simple_geometry(4, 4);
     let plane: Plane<u8> = Plane::new(geometry);
 
-    assert_eq!(plane.width().get(), 4);
-    assert_eq!(plane.height().get(), 4);
+    assert_eq!(plane.width(), 4);
+    assert_eq!(plane.height(), 4);
 
     // All pixels should be initialized to zero
     for pixel in plane.pixels() {
@@ -50,8 +50,8 @@ fn plane_new_u16() {
     let geometry = simple_geometry(8, 8);
     let plane: Plane<u16> = Plane::new(geometry);
 
-    assert_eq!(plane.width().get(), 8);
-    assert_eq!(plane.height().get(), 8);
+    assert_eq!(plane.width(), 8);
+    assert_eq!(plane.height(), 8);
 
     // All pixels should be initialized to zero
     for pixel in plane.pixels() {
@@ -59,27 +59,13 @@ fn plane_new_u16() {
     }
 }
 
-#[cfg(miri)]
-#[test]
-fn mutable_geometry_fields_can_break_row_slice_invariant() {
-    let mut geometry = simple_geometry(1, 1);
-    geometry.pad_left = 1;
-
-    // Regression test: `PlaneGeometry` fields are public, so constructors must
-    // restore the dependent `stride = width + pad_left + pad_right` invariant
-    // before row iteration relies on it.
-    let plane: Plane<u8> = Plane::new(geometry);
-    assert_eq!(plane.geometry.stride.get(), 2);
-    assert_eq!(plane.rows().next(), Some(&[0][..]));
-}
-
 #[test]
 fn plane_dimensions() {
     let geometry = simple_geometry(16, 9);
     let plane: Plane<u8> = Plane::new(geometry);
 
-    assert_eq!(plane.width().get(), 16);
-    assert_eq!(plane.height().get(), 9);
+    assert_eq!(plane.width(), 16);
+    assert_eq!(plane.height(), 9);
 }
 
 #[test]
@@ -300,8 +286,8 @@ fn plane_with_padding() {
     let mut plane: Plane<u8> = Plane::new(geometry);
 
     // Width and height should reflect visible area
-    assert_eq!(plane.width().get(), 4);
-    assert_eq!(plane.height().get(), 3);
+    assert_eq!(plane.width(), 4);
+    assert_eq!(plane.height(), 3);
 
     // Fill visible pixels
     for (i, pixel) in plane.pixels_mut().enumerate() {
@@ -368,8 +354,7 @@ fn plane_debug() {
                 pad_top: 0, \
                 pad_bottom: 0, \
                 subsampling_x: 1, \
-                subsampling_y: 1, \
-                _marker: () \
+                subsampling_y: 1 \
             } \
         }"
     );
@@ -380,7 +365,7 @@ fn data_origin_no_padding() {
     let geometry = simple_geometry(4, 4);
     let plane: Plane<u8> = Plane::new(geometry);
 
-    assert_eq!(plane.data_origin(), 0);
+    assert_eq!(plane.geometry.data_origin(), 0);
 }
 
 #[test]
@@ -389,7 +374,7 @@ fn data_origin_with_padding() {
     let plane: Plane<u8> = Plane::new(geometry);
 
     // Origin should be: stride * pad_top + pad_left = 8 * 1 + 2 = 10
-    assert_eq!(plane.data_origin(), 10);
+    assert_eq!(plane.geometry.data_origin(), 10);
 }
 
 #[cfg(feature = "padding_api")]
@@ -410,7 +395,7 @@ fn padding_api_geometry_alloc_height() {
 
     assert_eq!(
         plane.data().len(),
-        geometry.alloc_height().get() * geometry.stride.get()
+        geometry.alloc_height() * geometry.stride()
     );
 }
 
@@ -557,8 +542,8 @@ fn large_plane() {
     let geometry = simple_geometry(1920, 1080);
     let plane: Plane<u8> = Plane::new(geometry);
 
-    assert_eq!(plane.width().get(), 1920);
-    assert_eq!(plane.height().get(), 1080);
+    assert_eq!(plane.width(), 1920);
+    assert_eq!(plane.height(), 1080);
     assert_eq!(plane.pixels().count(), 1920 * 1080);
 }
 
