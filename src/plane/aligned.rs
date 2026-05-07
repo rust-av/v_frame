@@ -2,13 +2,12 @@ use std::alloc::{Layout, alloc, alloc_zeroed, dealloc, handle_alloc_error};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit, align_of};
-use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
 
 use crate::pixel::Pixel;
 
-// Minimum data alignment to help with SIMD. Non-empty allocations use this or
+// Minimum data alignment to help with SIMD. Allocations use this or
 // `align_of::<T>()`, whichever is larger.
 const DATA_ALIGNMENT: usize = {
     if cfg!(target_arch = "wasm32") && cfg!(not(target_os = "wasi")) {
@@ -33,41 +32,41 @@ unsafe impl<T: Send> Send for AlignedData<T> {}
 unsafe impl<T: Sync> Sync for AlignedData<T> {}
 
 impl<T> AlignedData<T> {
-    const fn layout(len: NonZeroUsize) -> Layout {
+    const fn layout(len: usize) -> Layout {
         const { assert!(DATA_ALIGNMENT.is_power_of_two()) };
+        const { assert!(size_of::<T>() > 0, "T must be Sized") };
         let alignment = if align_of::<T>() > DATA_ALIGNMENT {
             align_of::<T>()
         } else {
             DATA_ALIGNMENT
         };
-        let t_size = const { NonZeroUsize::new(size_of::<T>()).expect("T is Sized") };
 
         let size = len
-            .checked_mul(t_size)
+            .checked_mul(size_of::<T>())
             .expect("allocation size does not overflow usize");
 
-        match Layout::from_size_align(size.get(), alignment) {
+        match Layout::from_size_align(size, alignment) {
             Ok(l) => l,
             _ => panic!("invalid layout"),
         }
     }
 
     pub fn new_uninit(len: usize) -> AlignedData<MaybeUninit<T>> {
-        let ptr = if let Some(len) = NonZeroUsize::new(len) {
-            let layout = Self::layout(len);
-            // SAFETY: `Self::layout` guarantees that the layout is valid and has nonzero size.
-            let ptr = unsafe { alloc(layout) as *mut MaybeUninit<T> };
-            let Some(ptr) = NonNull::new(ptr) else {
-                handle_alloc_error(layout);
-            };
-
-            NonNull::slice_from_raw_parts(ptr, len.get())
+        let layout = Self::layout(len);
+        let ptr = if layout.size() != 0 {
+            // SAFETY: `Self::layout` guarantees that the layout is valid and
+            // layout.size() is checked above.
+            let ptr = unsafe { alloc(layout).cast() };
+            match NonNull::new(ptr) {
+                Some(p) => p,
+                None => handle_alloc_error(layout),
+            }
         } else {
-            NonNull::slice_from_raw_parts(NonNull::dangling(), 0)
+            layout.dangling_ptr().cast()
         };
 
         AlignedData {
-            ptr,
+            ptr: NonNull::slice_from_raw_parts(ptr, len),
             _marker: PhantomData,
         }
     }
@@ -95,23 +94,22 @@ impl<T> AlignedData<MaybeUninit<T>> {
 impl<T: Pixel> AlignedData<T> {
     /// Zeroed.
     pub fn new(len: usize) -> Self {
-        let ptr = if let Some(len) = NonZeroUsize::new(len) {
-            let layout = Self::layout(len);
-            // SAFETY:
-            // - `Self::layout` guarantees that the layout is valid and has nonzero size
-            // - The Pixel trait guarantees that zeroed memory is a valid T
-            let ptr = unsafe { alloc_zeroed(layout) as *mut T };
-            let Some(ptr) = NonNull::new(ptr) else {
-                handle_alloc_error(layout);
-            };
-
-            NonNull::slice_from_raw_parts(ptr, len.get())
+        let layout = Self::layout(len);
+        let ptr = if layout.size() != 0 {
+            // SAFETY: `Self::layout` guarantees that the layout is valid and
+            // layout.size() is checked above.
+            // The Pixel trait guarantees that zeroed memory is a valid T
+            let ptr = unsafe { alloc_zeroed(layout).cast() };
+            match NonNull::new(ptr) {
+                Some(p) => p,
+                None => handle_alloc_error(layout),
+            }
         } else {
-            NonNull::slice_from_raw_parts(NonNull::dangling(), 0)
+            layout.dangling_ptr().cast()
         };
 
         Self {
-            ptr,
+            ptr: NonNull::slice_from_raw_parts(ptr, len),
             _marker: PhantomData,
         }
     }
@@ -181,10 +179,11 @@ impl<T: Clone> Clone for AlignedData<T> {
 
 impl<T> Drop for AlignedData<T> {
     fn drop(&mut self) {
-        let layout = match NonZeroUsize::new(self.len()) {
-            Some(len) => Self::layout(len),
-            None => return, // nothing allocated, nothing to deallocate
-        };
+        let layout = Self::layout(self.len());
+        if layout.size() == 0 {
+            // nothing allocated, nothing to deallocate
+            return;
+        }
 
         // drop the contained T (i.e. dropping [T]), then dealloc
 

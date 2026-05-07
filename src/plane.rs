@@ -16,18 +16,14 @@
 //! # Memory Layout
 //!
 //! Planes store data in a contiguous, aligned buffer with support for padding on all sides:
-//! - Non-empty allocations are aligned to at least 64 bytes on most targets
-//!   (SIMD-friendly)
-//! - Non-empty allocations are aligned to at least 8 bytes on `wasm32` targets
-//!   that are not WASI
-//! - If `T` has stricter alignment requirements, the allocation uses
-//!   `std::mem::align_of::<T>()` instead
+//! - Data is aligned to at least 64 bytes on most targets (SIMD-friendly)
+//! - Data is aligned to at least 8 bytes on `wasm32` targets that are not WASI
+//! - If `T` has stricter alignment requirements, the allocation uses `align_of::<T>()` instead
 //! - Padding pixels surround the visible area for codec algorithms that need border access
 //!
-//! More precisely, non-empty plane data is allocated with
-//! `max(DATA_ALIGNMENT, std::mem::align_of::<T>())`, where `DATA_ALIGNMENT` is
-//! 64 except on non-WASI `wasm32` targets, where it is 8. Empty planes do not
-//! allocate and must not be assumed to have this extra SIMD alignment.
+//! More precisely, plane data is aligned to `max(DATA_ALIGNMENT, align_of::<T>())`,
+//! where `DATA_ALIGNMENT` is 64 except on non-WASI `wasm32` targets, where it is 8.
+//! Empty planes do not allocate but the dangling pointers still follow these alignment rules.
 //!
 //! # API Design
 //!
@@ -71,8 +67,7 @@ use crate::pixel::Pixel;
 ///   (optimized for SIMD operations)
 /// - Non-empty allocations are aligned to at least 8 bytes on `wasm32` targets
 ///   that are not WASI
-/// - If `T` has stricter alignment requirements, the allocation uses
-///   `std::mem::align_of::<T>()` instead
+/// - If `T` has stricter alignment requirements, the allocation uses `align_of::<T>()` instead
 ///
 /// More precisely, non-empty plane data is allocated with
 /// `max(DATA_ALIGNMENT, std::mem::align_of::<T>())`, where `DATA_ALIGNMENT` is
@@ -135,15 +130,14 @@ impl<T> Plane<T> {
     ///
     /// # Allocation Alignment
     ///
-    /// For non-empty planes, the allocation returned by [`data`][Plane::data]
-    /// and [`data_mut`][Plane::data_mut] is aligned to
-    /// `max(DATA_ALIGNMENT, std::mem::align_of::<T>())`, where `DATA_ALIGNMENT`
+    /// The allocation returned by [`data`][Plane::data] and [`data_mut`][Plane::data_mut]
+    /// is aligned to `max(DATA_ALIGNMENT, align_of::<T>())`, where `DATA_ALIGNMENT`
     /// is 64 except on non-WASI `wasm32` targets, where it is 8. This matters
     /// if you use unsafe code to access the backing pointer directly, especially
     /// with over-aligned `T`.
     ///
-    /// Empty planes do not allocate and must not be assumed to have the extra
-    /// SIMD alignment beyond what Rust requires for an empty `[T]` slice.
+    /// Empty planes do not allocate but the dangling pointers can still be assumed to be
+    /// aligned as described above.
     ///
     /// # Example
     ///
