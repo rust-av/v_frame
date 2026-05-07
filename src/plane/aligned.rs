@@ -245,6 +245,21 @@ mod tests {
     }
 
     #[test]
+    fn guarantee_alignment_for_empty() {
+        let data = AlignedData::<u8>::new_uninit(0);
+        assert_eq!(data.as_ptr().align_offset(DATA_ALIGNMENT), 0);
+
+        let data = AlignedData::<u16>::new_uninit(0);
+        assert_eq!(data.as_ptr().align_offset(DATA_ALIGNMENT), 0);
+
+        #[expect(dead_code)]
+        #[repr(align(1048576))]
+        struct OverAligned([u8; 1]);
+        let data = AlignedData::<OverAligned>::new_uninit(0);
+        assert_eq!(data.as_ptr().align_offset(DATA_ALIGNMENT), 0);
+    }
+
+    #[test]
     #[should_panic(expected = "invalid layout")]
     fn invalid_layout_panic() {
         let too_big = isize::MAX as usize + 100;
