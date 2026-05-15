@@ -14,6 +14,7 @@
 - **Support for common subsampling formats**: YUV 4:2:0, 4:2:2, 4:4:4, and monochrome
 - **Performant API**: Efficient row-based and pixel-based data access
 - **SIMD-friendly data alignment**: Plane data is aligned to at least 64 bytes on most targets
+- **`no_std` support**: Does not depend on the standard library (`alloc` is required however)
 - **WebAssembly support**: Works in both browser (`wasm32-unknown-unknown`) and WASI environments
 
 ## Installation
@@ -84,6 +85,12 @@ for pixel_row in frame.y_plane.rows() {
     }
 }
 ```
+
+## `no_std` support
+
+This crate does not depend on the standard library `std` but does require `alloc` to allocate memory for `Plane<T>` data.
+
+Users linking against `std` don't have to do anything. If you want to use this crate without `std`, you need to setup and configure a global allocator. The [Embedded Rust Book](https://docs.rust-embedded.org/book/collections/index.html#using-alloc) might be helpful.
 
 ## WebAssembly Support
 
