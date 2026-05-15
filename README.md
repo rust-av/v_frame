@@ -6,91 +6,47 @@
 [![dependency status](https://deps.rs/repo/github/rust-av/v_frame/status.svg)](https://deps.rs/repo/github/rust-av/v_frame)
 [![codecov](https://codecov.io/github/rust-av/v_frame/branch/main/graph/badge.svg?token=MKT1AZREF0)](https://codecov.io/github/rust-av/v_frame)
 
-A Rust library providing efficient data structures and utilities for handling YUV video frames and planes. Originally developed as part of the [rav1e](https://github.com/xiph/rav1e) video encoder, v_frame has been extracted into a standalone crate for broader use across the Rust AV ecosystem.
+`v_frame` provides data structures and utilities for handling YUV video frames. Originally developed as part of the [rav1e](https://github.com/xiph/rav1e) video encoder, `v_frame` has been extracted into a standalone crate for broader use across the Rust AV ecosystem.
 
 ## Features
 
 - **Type-safe pixel handling**: Generic `Pixel` trait supporting both 8-bit (`u8`) and high bit-depth (`u16`) video
-- **Flexible plane structure**: Efficient memory layout with configurable padding for SIMD operations
-- **Multiple chroma formats**: Support for YUV 4:2:0, 4:2:2, 4:4:4, and monochrome
-- **Builder pattern API**: Safe and ergonomic frame construction with compile-time guarantees
-- **SIMD-friendly alignment**: Plane data is aligned to at least 64 bytes on most targets, 8 bytes on non-WASI `wasm32`, or `align_of::<T>()` if larger
+- **Support for common subsampling formats**: YUV 4:2:0, 4:2:2, 4:4:4, and monochrome
+- **Performant API**: Efficient row-based and pixel-based data access
+- **SIMD-friendly data alignment**: Plane data is aligned to at least 64 bytes on most targets
 - **WebAssembly support**: Works in both browser (`wasm32-unknown-unknown`) and WASI environments
-- **Zero-copy iterators**: Efficient row-based and pixel-based iteration without allocations
 
 ## Installation
 
-Add this to your `Cargo.toml`:
+Run `cargo add v_frame` or add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-v_frame = "0.5"
+v_frame = "0.6"
 ```
 
-## Quick Start
+## The Pixel Trait
 
-```rust
-use v_frame::{
-    frame::FrameBuilder,
-    chroma::ChromaSubsampling,
-};
-
-// Create a 1920x1080 YUV 4:2:0 frame with 8-bit pixels
-let frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)
-.build::<u8>()
-.unwrap();
-
-// Access the Y plane (luma)
-let y_plane = &frame.y_plane;
-println!("Y plane: {}x{}", y_plane.width(), y_plane.height());
-
-// Iterate over rows
-for row in y_plane.rows() {
-    // Process each row of pixels
-}
-```
-
-## Core Concepts
-
-### The Pixel Trait
-
-v_frame is built around a generic `Pixel` trait that abstracts over pixel data types:
+v_frame is built around a generic `Pixel` trait that abstracts the two possible underlying data types:
 - `u8` for 8-bit video
 - `u16` for high bit-depth video (9-16 bits)
 
-The type system enforces correct usage at compile time, preventing mismatches between declared bit depth and pixel type.
+The API prevents mismatches between declared bit depth and pixel type.
 
-### Frame Structure
+## Usage
 
-A `Frame` contains:
-- `y_plane`: Luma (brightness) plane
-- `u_plane`: First chroma plane (None for grayscale)
-- `v_plane`: Second chroma plane (None for grayscale)
-- `subsampling`: Chroma subsampling mode
-- `bit_depth`: Bits per pixel (8-16)
-
-### Chroma Subsampling
-
-v_frame supports standard YUV formats:
-- `Yuv420`: Half-resolution chroma (most common, used in H.264/H.265)
-- `Yuv422`: Half-width chroma (used in professional video)
-- `Yuv444`: Full-resolution chroma (highest quality)
-- `Monochrome`: Grayscale, no chroma planes
-
-## Usage Examples
-
-### Creating a High Bit-Depth Frame
+### Creating a Frame
 
 ```rust
 use v_frame::{frame::FrameBuilder, chroma::ChromaSubsampling};
 
 // 10-bit 4K UHD frame
 let frame = FrameBuilder::new(3840, 2160, ChromaSubsampling::Yuv420, 10)
-.build::<u16>()
-.unwrap();
+    .build::<u16>()
+    .unwrap();
 ```
 
-### Adding Padding for SIMD Operations
+### Adding padding pixels
 
 ```rust
 use v_frame::{frame::FrameBuilder, chroma::ChromaSubsampling};
@@ -112,8 +68,8 @@ let frame = builder.build::<u8>().unwrap();
 use v_frame::{frame::FrameBuilder, chroma::ChromaSubsampling};
 
 let mut frame = FrameBuilder::new(640, 480, ChromaSubsampling::Yuv420, 8)
-.build::<u8>()
-.unwrap();
+    .build::<u8>()
+    .unwrap();
 
 // Access a specific row
 if let Some(row) = frame.y_plane.row_mut(10) {
@@ -129,66 +85,22 @@ for pixel_row in frame.y_plane.rows() {
 }
 ```
 
-### Creating a Grayscale Frame
-
-```rust
-use v_frame::{frame::FrameBuilder, chroma::ChromaSubsampling};
-
-let frame = FrameBuilder::new(1280, 720, ChromaSubsampling::Monochrome, 8)
-.build::<u8>()
-.unwrap();
-
-// u_plane and v_plane are None for monochrome
-assert!(frame.u_plane.is_none());
-assert!(frame.v_plane.is_none());
-```
-
 ## WebAssembly Support
 
-v_frame works in WebAssembly environments with appropriate feature detection:
+v_frame works in WebAssembly environments:
 
 ```bash
-# Build for browser
+# Build for browser environments
 cargo build --target wasm32-unknown-unknown
 
 # Build for WASI
-cargo build --target wasm32-wasi
-
-# Test in browsers
-wasm-pack test --headless --chrome --firefox
+cargo build --target wasm32-wasip1
 ```
-
-The crate automatically adjusts memory alignment for WebAssembly: non-WASI
-`wasm32` targets use an 8-byte minimum alignment, while WASI and native targets
-use a 64-byte minimum. Over-aligned pixel data uses `align_of::<T>()` if that is
-larger.
-
-## Feature Flags
-
-- `padding_api`: Exposes low-level APIs for direct access to plane padding data (`geometry()`, `data()`, `data_mut()`)
-
-## Requirements
-
-- Rust 1.95.0 or later
-- For WebAssembly: `wasm-bindgen` is automatically included for `wasm32-unknown-unknown` target
 
 ## Documentation
 
 - [API Documentation](https://docs.rs/v_frame)
 - [Crates.io](https://crates.io/crates/v_frame)
-
-## Building and Testing
-
-```bash
-# Build with linting
-cargo clippy
-
-# Run tests
-cargo test
-
-# Verify MSRV
-cargo msrv verify
-```
 
 ## Contributing
 

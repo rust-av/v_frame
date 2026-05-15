@@ -13,7 +13,7 @@ include = ["Cargo.toml", "README.md", "LICENSE", "src"]
 num-traits = "0.2.19"
 
 [features]
-padding_api = []
+padding_api = [] # exposes low-level APIs that allow bypassing padding
 
 [dev-dependencies.criterion]
 version = "0.8"
