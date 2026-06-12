@@ -332,18 +332,8 @@ impl<T: Pixel> Plane<T> {
         let total = self.width() * self.height() * byte_width;
         ExactSizeWrapper {
             iter: self.pixels().flat_map(move |pix| {
-                let bytes: [u8; 2] = if byte_width == 1 {
-                    [
-                        pix.to_u8()
-                            .expect("Pixel::byte_data only supports u8 and u16 pixels"),
-                        0,
-                    ]
-                } else {
-                    pix.to_u16()
-                        .expect("Pixel::byte_data only supports u8 and u16 pixels")
-                        .to_le_bytes()
-                };
-                bytes.into_iter().take(byte_width)
+                let pix: u16 = pix.into();
+                pix.to_le_bytes().into_iter().take(byte_width)
             }),
             len: total,
         }

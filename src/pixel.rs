@@ -22,7 +22,6 @@
 //! - 8-bit frames must use `u8`
 //! - 9-16 bit frames must use `u16`
 
-use num_traits::PrimInt;
 use std::fmt::Debug;
 
 mod private {
@@ -56,7 +55,19 @@ mod private {
 /// i.e. using [`std::mem::zeroed`] must __not__ cause undefined behavior for
 /// implementing types.
 pub unsafe trait Pixel:
-    Debug + Copy + Clone + Default + Send + Sync + PrimInt + 'static + private::Sealed
+    Sized
+    + Debug
+    + Copy
+    + Clone
+    + Default
+    + Send
+    + Sync
+    + TryInto<u8, Error: core::error::Error>
+    + Into<u16>
+    + From<u8>
+    + TryFrom<u16, Error: core::error::Error>
+    + 'static
+    + private::Sealed
 {
 }
 
