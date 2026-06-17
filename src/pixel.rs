@@ -72,12 +72,16 @@
 //! }
 //!
 //! fn clamp_to_range(value: i32, bit_depth: u8) -> u16 {
-//!     let bit_depth_max = (1u16 << bit_depth) - 1;
+//!     assert!(
+//!         bit_depth >= 8 && bit_depth <= 16,
+//!         "only bit depths 8-16 are supported"
+//!     );
+//!     let bit_depth_max = (1i32 << bit_depth) - 1;
 //!
 //!     if value < 0 {
 //!         0
-//!     } else if value > i32::from(bit_depth_max) {
-//!         bit_depth_max
+//!     } else if value > bit_depth_max {
+//!         bit_depth_max as u16
 //!     } else {
 //!         value as u16
 //!     }
