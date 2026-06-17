@@ -31,11 +31,11 @@
 //! For this purpose, `Pixel` is a supertrait of some conversions from the standard
 //! library, namely:
 //! - `Into<u16>` to convert any pixel into a `u16`,
-//! - `TryInto<u8>` to try to convert any pixel into a `u8` (not possible if `T` is larger
-//!   than one byte),
+//! - `TryInto<u8>` to try to convert any pixel into a `u8` (not possible if the pixel value
+//!   is outside of the range representable by `u8`),
 //! - `From<u8>` to convert any `u8` into a Pixel containing the given value and
-//! - `TryFrom<u16>` to try to convert any `u16` into a `T` (not possible if `T` is smaller
-//!   than two bytes).
+//! - `TryFrom<u16>` to try to convert any `u16` into a `T` (not possible if the source value
+//!   is outside of the range representable by `T`).
 //!
 //! For example, to sum all pixels in a row:
 //!
