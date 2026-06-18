@@ -9,9 +9,6 @@ edition = "2024"
 repository = "https://github.com/rust-av/v_frame"
 include = ["Cargo.toml", "README.md", "LICENSE", "src"]
 
-[dependencies]
-num-traits = "0.2.19"
-
 [features]
 padding_api = [] # exposes low-level APIs that allow bypassing padding
 
