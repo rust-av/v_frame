@@ -12,6 +12,8 @@
 use super::*;
 use crate::chroma::ChromaSubsampling;
 
+use alloc::format;
+
 #[test]
 fn plane_access() {
     let mut frame = FrameBuilder::new(1920, 1080, ChromaSubsampling::Yuv420, 8)

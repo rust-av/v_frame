@@ -7,7 +7,7 @@
 // Media Patent License 1.0 was not distributed with this source code in the
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
-use std::fmt;
+use core::fmt;
 
 /// This enum represents all possible error conditions that can occur during
 /// frame creation, including data validation errors, unsupported formats,
@@ -52,4 +52,4 @@ impl fmt::Display for FrameError {
     }
 }
 
-impl std::error::Error for FrameError {}
+impl core::error::Error for FrameError {}

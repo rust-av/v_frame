@@ -42,7 +42,7 @@ pub use error::CopyError;
 mod tests;
 
 #[cfg(feature = "padding_api")]
-use std::mem::MaybeUninit;
+use core::mem::MaybeUninit;
 
 mod aligned;
 use aligned::AlignedData;
