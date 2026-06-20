@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.7.0
+
+- [Breaking] `PlaneGeometry` fields are now private; use the provided getters instead.
+- [Breaking] Arithmetic and bitwise operations removed from the `Pixel` trait; convert to a concrete numeric type before performing arithmetic.
+- The crate is now `#![no_std]` (requires `alloc`).
+- Fix alignment promise for empty `AlignedData`; MSRV bumped to 1.95.
+
 ## Version 0.6.0
 
 - [Breaking] `FrameBuilder`, `Plane`, and geometry APIs now take plain `usize` / zeroable values instead of `NonZero*` wrappers.
